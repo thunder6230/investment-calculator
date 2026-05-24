@@ -338,3 +338,35 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; }
   background: var(--border) !important;
   border-color: var(--muted) !important;
 }
+
+/* ── Future Expense Milestones Styles ── */
+.milestones-list {
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.milestone-item {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.milestone-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.milestone-item button {
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.milestone-item button:hover {
+  color: #ef4444 !important;
+  transform: scale(1.2);
+}
+select:focus, input:focus {
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.15);
+}
+input[type="checkbox"] {
+  accent-color: var(--green);
+}
+option {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}

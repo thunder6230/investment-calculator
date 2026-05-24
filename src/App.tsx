@@ -6,6 +6,8 @@ import { calculateProjection, yearlyContribution, formatCurrency } from './utils
 import { calculateAustrianNetIncome } from './utils/austrianTax';
 import './App.css';
 
+import type { Milestone } from './utils/investmentCalc';
+
 interface Draft {
   name: string;
   timestamp: number;
@@ -20,6 +22,8 @@ interface Draft {
   maxRate: number;
   lifeInsurance: number;
   loanRepayment: number;
+  stepUpRate?: number;
+  milestones?: Milestone[];
 }
 
 const lastSession = (() => {
@@ -51,6 +55,32 @@ export default function App() {
   const [lifeInsurance, setLifeInsurance] = useState<number>(() => lastSession.lifeInsurance ?? 0);
   const [loanRepayment, setLoanRepayment] = useState<number>(() => lastSession.loanRepayment ?? 0);
 
+  // ── New Planning States ───────────────────────────────────────────────────
+  const [stepUpRate, setStepUpRate] = useState<number>(() => lastSession.stepUpRate ?? 0);
+  const [milestones, setMilestones] = useState<Milestone[]>(() => {
+    if (lastSession.milestones) return lastSession.milestones;
+    return [
+      {
+        id: 'default-loan-payoff',
+        name: 'Car Loan Paid Off',
+        amount: 300,
+        type: 'decrease',
+        startYear: 5,
+        reinvest: true,
+      }
+    ];
+  });
+
+  // Milestone Builder inputs
+  const [newMilestoneName, setNewMilestoneName] = useState('');
+  const [newMilestoneAmount, setNewMilestoneAmount] = useState<number>(300);
+  const [newMilestoneType, setNewMilestoneType] = useState<'decrease' | 'increase'>('decrease');
+  const [newMilestoneStartYear, setNewMilestoneStartYear] = useState<number>(5);
+  const [newMilestoneReinvest, setNewMilestoneReinvest] = useState<boolean>(true);
+
+  // Interactive budget forecasting year state
+  const [budgetYear, setBudgetYear] = useState<number>(0);
+
   // ── Scenario Manager (Drafts) State ───────────────────────────────────────
   const [savedDrafts, setSavedDrafts] = useState<Draft[]>(() => {
     const drafts = localStorage.getItem('investment-calculator-drafts');
@@ -79,6 +109,8 @@ export default function App() {
       maxRate,
       lifeInsurance,
       loanRepayment,
+      stepUpRate,
+      milestones,
     };
     localStorage.setItem('investment-calculator-last-session', JSON.stringify(data));
   }, [
@@ -93,6 +125,8 @@ export default function App() {
     maxRate,
     lifeInsurance,
     loanRepayment,
+    stepUpRate,
+    milestones,
   ]);
 
   // Save current state as a new named draft
@@ -112,6 +146,8 @@ export default function App() {
       maxRate,
       lifeInsurance,
       loanRepayment,
+      stepUpRate,
+      milestones,
     };
     const updated = [newDraft, ...savedDrafts.filter((d) => d.name !== newDraft.name)];
     setSavedDrafts(updated);
@@ -134,6 +170,8 @@ export default function App() {
       setMaxRate(found.maxRate);
       setLifeInsurance(found.lifeInsurance ?? 0);
       setLoanRepayment(found.loanRepayment ?? 0);
+      setStepUpRate(found.stepUpRate ?? 0);
+      setMilestones(found.milestones ?? []);
     }
   };
 
@@ -159,8 +197,11 @@ export default function App() {
         years,
         minRate: minRate / 100,
         maxRate: maxRate / 100,
+        stepUpRate: stepUpRate / 100,
+        milestones,
+        baseFixedCosts: fixedCosts,
       }),
-    [startCapital, monthlyInvest, juneExtra, decemberExtra, years, minRate, maxRate]
+    [startCapital, monthlyInvest, juneExtra, decemberExtra, years, minRate, maxRate, stepUpRate, milestones, fixedCosts]
   );
 
   const idealProjection = useMemo(
@@ -173,11 +214,28 @@ export default function App() {
         years,
         minRate: minRate / 100,
         maxRate: maxRate / 100,
+        stepUpRate: 0,
+        milestones: [],
+        baseFixedCosts: fixedCosts,
       }),
-    [startCapital, taxResult.netRegularMonthly, taxResult.net13th, taxResult.net14th, years, minRate, maxRate]
+    [startCapital, taxResult.netRegularMonthly, taxResult.net13th, taxResult.net14th, years, minRate, maxRate, fixedCosts]
   );
 
-  const totalMonthlySavings = monthlyInvest + lifeInsurance + loanRepayment;
+  // Auto-cap forecast year if years is reduced
+  useEffect(() => {
+    if (budgetYear > years) {
+      setBudgetYear(years);
+    }
+  }, [years, budgetYear]);
+
+  // Selected year data point for forecasting financial health
+  const activePointForBudget = useMemo(() => {
+    return projection.dataPoints.find((dp) => dp.year === budgetYear) || projection.dataPoints[0];
+  }, [projection.dataPoints, budgetYear]);
+
+  const activeFixedCosts = activePointForBudget.fixedCostsActive;
+  const activeMonthlyInvest = activePointForBudget.monthlyContribActive;
+  const activeTotalMonthlySavings = activeMonthlyInvest + lifeInsurance + loanRepayment;
 
   const needsPercent = Math.min(100, Math.round((fixedCosts / taxResult.netRegularMonthly) * 100));
   const savingsPercent = Math.min(100, Math.round((totalMonthlySavings / taxResult.netRegularMonthly) * 100));
@@ -361,6 +419,23 @@ export default function App() {
                 </span>
               }
             />
+
+            <div style={{ marginTop: '1rem', borderTop: '1px dashed var(--border)', paddingTop: '1rem' }}>
+              <SliderInput
+                label="Annual Contribution Growth (Step-Up)"
+                value={stepUpRate}
+                onChange={setStepUpRate}
+                min={0}
+                max={10}
+                step={0.5}
+                suffix="%"
+                formatValue={(v) => v.toFixed(1)}
+              />
+              <p style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: '-0.25rem', lineHeight: '1.3' }}>
+                Compounds annually. Try <strong className="input-hint-action" onClick={() => setStepUpRate(2)}>2%</strong> for inflation indexing or <strong className="input-hint-action" onClick={() => setStepUpRate(5)}>5%</strong> for planned salary raises.
+              </p>
+            </div>
+
             <div className="extra-savings-divider" style={{ borderTop: '1px solid var(--border)', margin: '1rem 0', paddingTop: '0.75rem' }} />
             <h3 className="section-title" style={{ fontSize: '0.82rem', color: 'var(--muted)', marginBottom: '0.75rem' }}>🛡️ Other Savings (Excluded from growth)</h3>
             <NumberInput
@@ -379,6 +454,211 @@ export default function App() {
             />
             <div className="summary-pill">
               Avg. yearly contribution: <strong>{formatCurrency(yearlyContrib)}</strong>
+            </div>
+          </section>
+
+          <section className="card">
+            <h2 className="section-title">⏳ Future Expense Milestones</h2>
+            <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '1rem', lineHeight: '1.4' }}>
+              Model future changes in expenses (e.g. paying off a car loan, finishing a mortgage, school costs). 
+              <strong> Auto-reinvesting</strong> savings dynamically boosts your monthly investments from that year onwards!
+            </p>
+
+            {/* Milestones list */}
+            {milestones.length > 0 ? (
+              <div className="milestones-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                {milestones.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`milestone-item ${m.type}`}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: 'var(--surface2)',
+                      border: `1px solid ${m.type === 'decrease' ? 'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)'}`,
+                      borderLeft: `4px solid ${m.type === 'decrease' ? 'var(--green)' : 'var(--red)'}`,
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text)' }}>
+                        {m.name}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                        {m.type === 'decrease' ? 'Saves' : 'Costs'} {formatCurrency(m.amount)}/mo • triggers after Year {m.startYear}
+                      </span>
+                      {m.type === 'decrease' && m.reinvest && (
+                        <span style={{ fontSize: '0.68rem', color: 'var(--emerald)', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                          ⚡ Auto-reinvested into growth portfolio!
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setMilestones(milestones.filter((item) => item.id !== m.id))}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--red)',
+                        cursor: 'pointer',
+                        fontSize: '1.1rem',
+                        fontWeight: '700',
+                        padding: '0.25rem',
+                      }}
+                      title="Remove milestone"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '1rem', background: 'var(--surface2)', borderRadius: '6px', border: '1px dashed var(--border)', fontSize: '0.78rem', color: 'var(--muted)', marginBottom: '1.25rem' }}>
+                No future expense milestones configured yet.
+              </div>
+            )}
+
+            {/* Form to add a milestone */}
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+              <h3 style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text)', marginBottom: '0.75rem' }}>➕ Add Expense Milestone</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Milestone Label</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Car loan finished, Rent increase"
+                    value={newMilestoneName}
+                    onChange={(e) => setNewMilestoneName(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.45rem 0.6rem',
+                      fontSize: '0.8rem',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface2)',
+                      color: 'var(--text)',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Amount (€/month)</label>
+                    <input
+                      type="number"
+                      min={10}
+                      step={50}
+                      value={newMilestoneAmount}
+                      onChange={(e) => setNewMilestoneAmount(Math.max(0, Number(e.target.value)))}
+                      style={{
+                        width: '100%',
+                        padding: '0.45rem 0.6rem',
+                        fontSize: '0.8rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface2)',
+                        color: 'var(--text)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Timing (After Year)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={years}
+                      value={newMilestoneStartYear}
+                      onChange={(e) => setNewMilestoneStartYear(Math.min(years, Math.max(1, Number(e.target.value))))}
+                      style={{
+                        width: '100%',
+                        padding: '0.45rem 0.6rem',
+                        fontSize: '0.8rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface2)',
+                        color: 'var(--text)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.5rem', alignItems: 'center' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Type of change</label>
+                    <select
+                      value={newMilestoneType}
+                      onChange={(e) => {
+                        const type = e.target.value as 'decrease' | 'increase';
+                        setNewMilestoneType(type);
+                        if (type === 'increase') setNewMilestoneReinvest(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.45rem',
+                        fontSize: '0.8rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface2)',
+                        color: 'var(--text)',
+                        outline: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <option value="decrease">📉 Decrease Expenses</option>
+                      <option value="increase">📈 Increase Expenses</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (!newMilestoneName.trim()) return;
+                      const newItem: Milestone = {
+                        id: 'milestone-' + Date.now(),
+                        name: newMilestoneName.trim(),
+                        amount: newMilestoneAmount,
+                        type: newMilestoneType,
+                        startYear: newMilestoneStartYear,
+                        reinvest: newMilestoneType === 'decrease' ? newMilestoneReinvest : false,
+                      };
+                      setMilestones([...milestones, newItem]);
+                      setNewMilestoneName('');
+                    }}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: 'var(--green)',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      height: '35px',
+                      alignSelf: 'end',
+                    }}
+                  >
+                    Add Trigger
+                  </button>
+                </div>
+
+                {newMilestoneType === 'decrease' && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '0.25rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={newMilestoneReinvest}
+                      onChange={(e) => setNewMilestoneReinvest(e.target.checked)}
+                      style={{ width: '15px', height: '15px', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text)' }}>
+                      Auto-reinvest savings into monthly contributions
+                    </span>
+                  </label>
+                )}
+              </div>
             </div>
           </section>
 
@@ -424,8 +704,39 @@ export default function App() {
             <div className="health-content">
               <div className="health-left">
                 <p className="health-desc">
-                  Based on your <strong>true monthly net ({formatCurrency(taxResult.netRegularMonthly)})</strong>, here is how your current budgeting and investments compare against the standard <strong>50/30/20 financial rule</strong>:
+                  Based on your <strong>true monthly net ({formatCurrency(taxResult.netRegularMonthly)})</strong>, here is how your budgeting and investments compare against the standard <strong>50/30/20 financial rule</strong>:
                 </p>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.85rem 0 0.5rem 0', background: 'var(--surface2)', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                    🔮 Forecast Budget in:
+                  </label>
+                  <select
+                    value={budgetYear}
+                    onChange={(e) => setBudgetYear(Number(e.target.value))}
+                    style={{
+                      flex: 1,
+                      padding: '0.3rem 0.5rem',
+                      fontSize: '0.78rem',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'var(--text)',
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value={0}>Year 0 (Current Baseline)</option>
+                    {projection.dataPoints.filter(dp => dp.year > 0).map((dp) => {
+                      const hasMilestone = dp.milestonesTriggered && dp.milestonesTriggered.length > 0;
+                      return (
+                        <option key={dp.year} value={dp.year}>
+                          Year {dp.year} {hasMilestone ? `🎉 (${dp.milestonesTriggered.map(m=>m.name).join(', ')})` : ''} (Invest: {formatCurrency(dp.monthlyContribActive)}/mo)
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
                 
                 <div className="budget-bar-container">
                   <div className="budget-bar-segment needs" style={{ width: `${needsPercent}%` }} title={`Needs: ${needsPercent}%`}>
@@ -448,15 +759,15 @@ export default function App() {
                 <div className="budget-metrics">
                   <div className="metric-box">
                     <span className="metric-title">Fixed Costs (Needs)</span>
-                    <span className="metric-val">{formatCurrency(fixedCosts)}</span>
+                    <span className="metric-val">{formatCurrency(activeFixedCosts)}</span>
                     <span className={`metric-badge ${needsPercent <= 50 ? 'bg-green' : needsPercent <= 60 ? 'bg-yellow' : 'bg-red'}`}>
                       {needsPercent <= 50 ? '✅ Healthy' : needsPercent <= 60 ? '⚠️ High' : '🚨 Critical'}
                     </span>
                   </div>
                   <div className="metric-box">
                     <span className="metric-title">Savings Rate</span>
-                    <span className="metric-val" title={`${formatCurrency(monthlyInvest)} portfolio + ${formatCurrency(lifeInsurance + loanRepayment)} other savings`}>
-                      {formatCurrency(totalMonthlySavings)}
+                    <span className="metric-val" title={`${formatCurrency(activeMonthlyInvest)} portfolio + ${formatCurrency(lifeInsurance + loanRepayment)} other savings`}>
+                      {formatCurrency(activeTotalMonthlySavings)}
                     </span>
                     <span className={`metric-badge ${savingsPercent >= 20 ? 'bg-green' : savingsPercent >= 10 ? 'bg-yellow' : 'bg-red'}`}>
                       {savingsPercent >= 20 ? '🚀 Wealth Builder' : savingsPercent >= 10 ? '👍 Good' : '⚠️ Low'}
@@ -464,14 +775,14 @@ export default function App() {
                   </div>
                   <div className="metric-box">
                     <span className="metric-title">Emergency Fund Target</span>
-                    <span className="metric-val">{formatCurrency(fixedCosts * 3)} - {formatCurrency(fixedCosts * 6)}</span>
+                    <span className="metric-val">{formatCurrency(activeFixedCosts * 3)} - {formatCurrency(activeFixedCosts * 6)}</span>
                     <span className="metric-badge bg-blue">ℹ️ 3-6 months needs</span>
                   </div>
                 </div>
               </div>
               
               <div className="health-right">
-                <h3 className="advice-title">💡 Personalized Recommendations</h3>
+                <h3 className="advice-title">💡 Personalized Recommendations (Year {budgetYear})</h3>
                 <ul className="advice-list">
                   {/* Needs Advice */}
                   {needsPercent > 50 ? (
@@ -487,11 +798,11 @@ export default function App() {
                   {/* Savings Advice */}
                   {savingsPercent < 20 ? (
                     <li>
-                      <strong>Boost regular savings:</strong> You save {savingsPercent}% of net ({formatCurrency(totalMonthlySavings)}/mo, comprising {formatCurrency(monthlyInvest)} in the portfolio and {formatCurrency(lifeInsurance + loanRepayment)} in other products). Upgrading to the recommended 20% ({formatCurrency(Math.round(taxResult.netRegularMonthly * 0.2))}/mo) would boost your projected {years}-year midpoint portfolio by <strong>{formatCurrency(Math.max(0, idealProjection.dataPoints[idealProjection.dataPoints.length - 1].midpoint - lastPoint.midpoint))}</strong>!
+                      <strong>Boost regular savings:</strong> You save {savingsPercent}% of net ({formatCurrency(activeTotalMonthlySavings)}/mo, comprising {formatCurrency(activeMonthlyInvest)} in the portfolio and {formatCurrency(lifeInsurance + loanRepayment)} in other products). Upgrading to the recommended 20% ({formatCurrency(Math.round(taxResult.netRegularMonthly * 0.2))}/mo) would boost your projected {years}-year midpoint portfolio by <strong>{formatCurrency(Math.max(0, idealProjection.dataPoints[idealProjection.dataPoints.length - 1].midpoint - lastPoint.midpoint))}</strong>!
                     </li>
                   ) : (
                     <li>
-                      <strong>Supercharged Saver!</strong> You are saving {savingsPercent}% of your regular net ({formatCurrency(totalMonthlySavings)}/mo, with {formatCurrency(monthlyInvest)} in the portfolio and {formatCurrency(lifeInsurance + loanRepayment)} in other products). You are significantly outperforming the standard 20% recommendation, building substantial wealth.
+                      <strong>Supercharged Saver!</strong> You are saving {savingsPercent}% of your regular net ({formatCurrency(activeTotalMonthlySavings)}/mo, with {formatCurrency(activeMonthlyInvest)} in the portfolio and {formatCurrency(lifeInsurance + loanRepayment)} in other products). You are significantly outperforming the standard 20% recommendation, building substantial wealth.
                     </li>
                   )}
                   
@@ -526,21 +837,63 @@ export default function App() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Year</th><th>Paid In</th><th>@ {minRate}%</th><th>Midpoint</th><th>@ {maxRate}%</th><th>Gain (low)</th><th>Gain (high)</th>
+                    <th>Year</th>
+                    <th>Monthly Invest</th>
+                    <th>Fixed Costs</th>
+                    <th>Paid In</th>
+                    <th>@ {minRate}%</th>
+                    <th>Midpoint</th>
+                    <th>@ {maxRate}%</th>
+                    <th>Triggered Events</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {projection.dataPoints.map((d) => (
-                    <tr key={d.year}>
-                      <td>{d.year}</td>
-                      <td>{formatCurrency(d.paidIn)}</td>
-                      <td>{formatCurrency(d.low)}</td>
-                      <td>{formatCurrency(d.midpoint)}</td>
-                      <td>{formatCurrency(d.high)}</td>
-                      <td className={d.low - d.paidIn >= 0 ? 'positive' : 'negative'}>{formatCurrency(d.low - d.paidIn)}</td>
-                      <td className={d.high - d.paidIn >= 0 ? 'positive' : 'negative'}>{formatCurrency(d.high - d.paidIn)}</td>
-                    </tr>
-                  ))}
+                  {projection.dataPoints.map((d) => {
+                    const isTriggered = d.milestonesTriggered && d.milestonesTriggered.length > 0;
+                    return (
+                      <tr
+                        key={d.year}
+                        style={
+                          isTriggered
+                            ? { background: 'rgba(74, 222, 128, 0.08)', borderLeft: '3px solid var(--green)' }
+                            : undefined
+                        }
+                      >
+                        <td>{d.year === 0 ? 'Start' : `Year ${d.year}`}</td>
+                        <td>{d.year === 0 ? '—' : formatCurrency(d.monthlyContribActive)}</td>
+                        <td>{formatCurrency(d.fixedCostsActive)}</td>
+                        <td>{formatCurrency(d.paidIn)}</td>
+                        <td>{formatCurrency(d.low)}</td>
+                        <td>{formatCurrency(d.midpoint)}</td>
+                        <td>{formatCurrency(d.high)}</td>
+                        <td style={{ textAlign: 'left', fontSize: '0.74rem' }}>
+                          {isTriggered ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                              {d.milestonesTriggered.map((m) => (
+                                <span
+                                  key={m.id}
+                                  style={{
+                                    display: 'inline-block',
+                                    background: m.type === 'decrease' ? 'rgba(74, 222, 128, 0.15)' : 'rgba(248, 113, 113, 0.15)',
+                                    color: m.type === 'decrease' ? 'var(--green)' : 'var(--red)',
+                                    border: `1px solid ${m.type === 'decrease' ? 'var(--green)' : 'var(--red)'}`,
+                                    borderRadius: '4px',
+                                    padding: '0.1rem 0.35rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.68rem',
+                                  }}
+                                >
+                                  {m.type === 'decrease' ? '🎉' : '⚠️'} {m.name} ({m.type === 'decrease' ? '+' : '-'}{formatCurrency(m.amount)}/mo {m.reinvest ? 'reinvested' : 'saved'})
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--muted)' }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

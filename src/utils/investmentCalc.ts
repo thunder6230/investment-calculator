@@ -5,12 +5,28 @@
  * The percentages the user enters are therefore already after-tax returns.
  */
 
+export interface Milestone {
+  id: string;
+  name: string;
+  amount: number;
+  type: 'decrease' | 'increase';
+  startYear: number; // e.g. occurs after X years
+  reinvest: boolean;
+}
+
 export interface YearDataPoint {
   year: number;
   paidIn: number;
   low: number;   // growth at minRate
   high: number;  // growth at maxRate
   midpoint: number; // midpoint between low and high
+  // Dynamic parameters active in this year
+  monthlyContribActive: number;
+  juneExtraActive: number;
+  decemberExtraActive: number;
+  yearlyContribActive: number;
+  fixedCostsActive: number;
+  milestonesTriggered: Milestone[];
 }
 
 export interface ProjectionResult {
@@ -33,11 +49,15 @@ export interface ProjectionParams {
   years: number;
   minRate: number; // e.g. 0.05
   maxRate: number; // e.g. 0.08
+  stepUpRate: number; // e.g. 0.02
+  milestones: Milestone[];
+  baseFixedCosts: number;
 }
 
 /**
  * Calculate year-by-year investment projections.
  * Contributions are modelled as monthly with two additional annual top-ups.
+ * Accounts for annual step-up contribution growth and dynamic expense milestones.
  */
 export function calculateProjection(params: ProjectionParams): ProjectionResult {
   const {
@@ -48,6 +68,9 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
     years,
     minRate,
     maxRate,
+    stepUpRate,
+    milestones,
+    baseFixedCosts,
   } = params;
 
   const midRate = (minRate + maxRate) / 2;
@@ -63,10 +86,51 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
   let totalContributed = startCapital;
 
   const dataPoints: YearDataPoint[] = [
-    { year: 0, paidIn: startCapital, low: startCapital, high: startCapital, midpoint: startCapital },
+    {
+      year: 0,
+      paidIn: startCapital,
+      low: startCapital,
+      high: startCapital,
+      midpoint: startCapital,
+      monthlyContribActive: monthlyContribution,
+      juneExtraActive: juneExtra,
+      decemberExtraActive: decemberExtra,
+      yearlyContribActive: monthlyContribution * 12 + juneExtra + decemberExtra,
+      fixedCostsActive: baseFixedCosts,
+      milestonesTriggered: [],
+    },
   ];
 
   for (let y = 1; y <= years; y++) {
+    // 1. Calculate active growth step-up factor
+    const stepUpFactor = Math.pow(1 + stepUpRate, y - 1);
+
+    // 2. Identify active milestones (triggered when year > startYear)
+    const activeMilestones = milestones.filter((m) => y > m.startYear);
+    
+    // Milestones that trigger EXACTLY in this year (first year of activity, i.e., y === startYear + 1)
+    const milestonesTriggered = milestones.filter((m) => y === m.startYear + 1);
+
+    // 3. Sum up reinvested savings from active decrease milestones
+    const reinvestedSavings = activeMilestones
+      .filter((m) => m.type === 'decrease' && m.reinvest)
+      .reduce((sum, m) => sum + m.amount, 0);
+
+    // 4. Calculate active contribution amounts
+    const monthlyContribActive = Math.round(monthlyContribution * stepUpFactor + reinvestedSavings);
+    const juneExtraActive = Math.round(juneExtra * stepUpFactor);
+    const decemberExtraActive = Math.round(decemberExtra * stepUpFactor);
+    const yearlyContribActive = monthlyContribActive * 12 + juneExtraActive + decemberExtraActive;
+
+    // 5. Calculate active fixed costs
+    const expenseReduction = activeMilestones
+      .filter((m) => m.type === 'decrease')
+      .reduce((sum, m) => sum + m.amount, 0);
+    const expenseIncrease = activeMilestones
+      .filter((m) => m.type === 'increase')
+      .reduce((sum, m) => sum + m.amount, 0);
+    const fixedCostsActive = Math.max(0, baseFixedCosts - expenseReduction + expenseIncrease);
+
     for (let m = 1; m <= 12; m++) {
       // Apply monthly growth
       balLow *= 1 + monthlyLow;
@@ -74,23 +138,23 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
       balHigh *= 1 + monthlyHigh;
 
       // Regular monthly contribution
-      balLow += monthlyContribution;
-      balMid += monthlyContribution;
-      balHigh += monthlyContribution;
-      totalContributed += monthlyContribution;
+      balLow += monthlyContribActive;
+      balMid += monthlyContribActive;
+      balHigh += monthlyContribActive;
+      totalContributed += monthlyContribActive;
 
       // Extra contributions in June (month 6) and December (month 12)
       if (m === 6) {
-        balLow += juneExtra;
-        balMid += juneExtra;
-        balHigh += juneExtra;
-        totalContributed += juneExtra;
+        balLow += juneExtraActive;
+        balMid += juneExtraActive;
+        balHigh += juneExtraActive;
+        totalContributed += juneExtraActive;
       }
       if (m === 12) {
-        balLow += decemberExtra;
-        balMid += decemberExtra;
-        balHigh += decemberExtra;
-        totalContributed += decemberExtra;
+        balLow += decemberExtraActive;
+        balMid += decemberExtraActive;
+        balHigh += decemberExtraActive;
+        totalContributed += decemberExtraActive;
       }
     }
 
@@ -100,6 +164,12 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
       low: Math.round(balLow),
       high: Math.round(balHigh),
       midpoint: Math.round(balMid),
+      monthlyContribActive,
+      juneExtraActive,
+      decemberExtraActive,
+      yearlyContribActive,
+      fixedCostsActive,
+      milestonesTriggered,
     });
   }
 

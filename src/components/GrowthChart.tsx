@@ -18,14 +18,29 @@ interface Props {
 
 function CustomTooltip({ active, payload, label }: Partial<TooltipContentProps<number, string>>) {
   if (!active || !payload?.length) return null;
+  const rawData = payload[0].payload as YearDataPoint;
+  
   return (
     <div className="tooltip-box">
       <p className="tooltip-title">Year {label}</p>
       {payload.map((entry) => (
-        <p key={entry.name} style={{ color: entry.color }}>
+        <p key={entry.name} style={{ color: entry.color, margin: '0.2rem 0', fontSize: '0.78rem' }}>
           {entry.name}: {formatCurrency(entry.value as number)}
         </p>
       ))}
+      {rawData && rawData.year > 0 && (
+        <div style={{ marginTop: '0.5rem', paddingTop: '0.4rem', borderTop: '1px solid var(--border)', fontSize: '0.74rem', color: 'var(--muted)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.2rem' }}>
+            <span>Invest: <strong>{formatCurrency(rawData.monthlyContribActive)}/mo</strong></span>
+            <span>Fixed Costs: <strong>{formatCurrency(rawData.fixedCostsActive)}/mo</strong></span>
+          </div>
+          {rawData.milestonesTriggered && rawData.milestonesTriggered.length > 0 && (
+            <div style={{ marginTop: '0.25rem', color: 'var(--emerald)', fontWeight: '600' }}>
+              🎉 Triggered: {rawData.milestonesTriggered.map((m) => m.name).join(', ')}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
