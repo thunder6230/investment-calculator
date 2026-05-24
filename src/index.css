@@ -1,0 +1,5 @@
+/* Global reset handled in App.css */
+html, body, #root {
+  min-height: 100vh;
+  background: #0f172a;
+}
