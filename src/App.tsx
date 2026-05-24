@@ -238,9 +238,9 @@ export default function App() {
   const activeTotalMonthlySavings = activeMonthlyInvest + lifeInsurance + loanRepayment;
 
   const needsPercent = Math.min(100, Math.round((fixedCosts / taxResult.netRegularMonthly) * 100));
-  const savingsPercent = Math.min(100, Math.round((totalMonthlySavings / taxResult.netRegularMonthly) * 100));
-  const wantsPercent = Math.max(0, 100 - needsPercent - savingsPercent);
-
+const savingsPercent = Math.min(100, Math.round((activeTotalMonthlySavings / taxResult.netRegularMonthly) * 100));
+const wantsPercent = Math.max(0, 100 - needsPercent - savingsPercent);
+ 
   const yearlyContrib = yearlyContribution(monthlyInvest, juneExtra, decemberExtra);
   const lastPoint = projection.dataPoints[projection.dataPoints.length - 1];
 
