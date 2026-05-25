@@ -370,3 +370,132 @@ option {
   background: var(--surface) !important;
   color: var(--text) !important;
 }
+
+/* ── Milestone Form Layouts ── */
+.form-grid-half {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.form-grid-split {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* ── Mobile Responsive Styles ── */
+@media (max-width: 600px) {
+  .app {
+    padding: 0.75rem;
+  }
+  .app-header {
+    padding: 1.25rem 0 1rem;
+  }
+  .app-header h1 {
+    font-size: 1.6rem;
+  }
+  .subtitle {
+    font-size: 0.85rem;
+  }
+  
+  .card {
+    padding: 0.85rem;
+  }
+  
+  /* Stacking form controls vertically on mobile */
+  .form-grid-half, .form-grid-split {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+  .form-grid-split button {
+    height: 38px !important;
+    margin-top: 0.25rem;
+  }
+  
+  /* Dynamic 2-column grid for summary metrics on mobile screens */
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+  .summary-card {
+    padding: 0.75rem !important;
+  }
+  .sc-value {
+    font-size: 1.05rem !important;
+  }
+  .sc-label {
+    font-size: 0.65rem !important;
+  }
+  .sc-sub {
+    font-size: 0.62rem !important;
+  }
+  
+  /* Stacking the budgeting section on mobile */
+  .health-content {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+  }
+  .budget-metrics {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+  
+  /* Custom responsive adjustments for chart height */
+  .chart-card {
+    padding: 1rem 0.25rem !important;
+  }
+  .recharts-responsive-container {
+    height: 280px !important;
+  }
+  
+  /* Table row font sizing */
+  .data-table th, .data-table td {
+    padding: 0.4rem 0.5rem !important;
+    font-size: 0.76rem !important;
+  }
+}
+
+/* ── Expense Tracker & Surplus Styles ── */
+.budget-tab:hover {
+  color: var(--text) !important;
+}
+.budget-bar-segment.buffer {
+  background: var(--yellow);
+  color: #0f172a;
+}
+.legend-dot.buffer {
+  background: var(--yellow);
+}
+
+@keyframes surplusPulse {
+  0% {
+    box-shadow: 0 0 0 0px rgba(52, 211, 153, 0.05);
+    border-color: rgba(52, 211, 153, 0.2);
+    background: rgba(52, 211, 153, 0.04) !important;
+  }
+  100% {
+    box-shadow: 0 0 8px 1px rgba(52, 211, 153, 0.15);
+    border-color: rgba(52, 211, 153, 0.4);
+    background: rgba(52, 211, 153, 0.08) !important;
+  }
+}
+.surplus-glow-box {
+  animation: surplusPulse 2s infinite alternate ease-in-out;
+}
+
+.expense-items-list::-webkit-scrollbar {
+  width: 4px;
+}
+.expense-items-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.expense-items-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+.expense-items-list::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+
