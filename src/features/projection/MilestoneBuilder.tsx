@@ -1,6 +1,6 @@
-import React from 'react';
 import { useInvestmentPlanner } from '../../context/InvestmentPlannerContext';
-import { formatCurrency, Milestone } from './projectionEngine';
+import { formatCurrency } from './projectionEngine';
+import type { Milestone } from './projectionEngine';
 
 export default function MilestoneBuilder() {
   const {

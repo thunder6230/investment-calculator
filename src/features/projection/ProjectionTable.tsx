@@ -1,4 +1,3 @@
-import React from 'react';
 import { useInvestmentPlanner } from '../../context/InvestmentPlannerContext';
 import { formatCurrency } from './projectionEngine';
 

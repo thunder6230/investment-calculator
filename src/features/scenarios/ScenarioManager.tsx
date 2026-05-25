@@ -1,4 +1,3 @@
-import React from 'react';
 import { useInvestmentPlanner } from '../../context/InvestmentPlannerContext';
 
 export default function ScenarioManager() {

@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   AreaChart,
   Area,
@@ -11,7 +10,8 @@ import {
 } from 'recharts';
 import type { TooltipContentProps } from 'recharts';
 import { useInvestmentPlanner } from '../../context/InvestmentPlannerContext';
-import { YearDataPoint, formatCurrency } from './projectionEngine';
+import { formatCurrency } from './projectionEngine';
+import type { YearDataPoint } from './projectionEngine';
 
 function CustomTooltip({ active, payload, label }: Partial<TooltipContentProps<number, string>>) {
   if (!active || !payload?.length) return null;

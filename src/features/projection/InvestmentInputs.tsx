@@ -1,4 +1,3 @@
-import React from 'react';
 import { useInvestmentPlanner } from '../../context/InvestmentPlannerContext';
 import NumberInput from '../../components/common/NumberInput';
 import SliderInput from '../../components/common/SliderInput';

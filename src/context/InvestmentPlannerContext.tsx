@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
-import { calculateAustrianNetIncome, TaxResult } from '../features/tax/taxCalculator';
-import { calculateProjection, yearlyContribution, formatCurrency, Milestone, YearDataPoint, ProjectionResult } from '../features/projection/projectionEngine';
+import type { TaxResult } from '../features/tax/taxCalculator';
+import { calculateAustrianNetIncome } from '../features/tax/taxCalculator';
+import type { Milestone, YearDataPoint, ProjectionResult } from '../features/projection/projectionEngine';
+import { calculateProjection, yearlyContribution } from '../features/projection/projectionEngine';
 
 export interface ExpenseItem {
   id: string;
