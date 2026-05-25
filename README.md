@@ -1,73 +1,59 @@
-# React + TypeScript + Vite
+# 🇦🇹 Austrian Investment Calculator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A premium, interactive web application engineered to calculate wealth compounding and compound growth timelines dynamically tailored to the unique **Austrian income tax, bonus system, and living costs context**.
 
-Currently, two official plugins are available:
+Built from the ground up using **React**, **TypeScript**, **Vite**, and **Recharts**, and structured using a scalable **Vertical Slice Architecture (VSA)**.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🚀 Live Demo & Screenshots
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+> [!TIP]
+> Experience the application's clean dark-themed dashboard, featuring responsive inputs, real-time custom charts, and progressive tax calculation summaries in action!
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## ✨ Features Spotlight
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+*   **🇦🇹 Austrian Tax Engine**: Handles social security contributions (respecting the Höchstbeitragsgrundlage maximum ceiling), progressive tax brackets, and highly favorable tax rates on 13th & 14th salary bonuses (*Urlaubsgeld* & *Weihnachtsgeld*).
+*   **📈 Compounding Projection Charts**: Tracks Paid In Capital vs. Midpoint Growth Portfolio vs. Min/Max Bands over customizable year spans.
+*   **📊 Timeline Budget Forecasting**: Select any future year (e.g. Year 10) to forecast your future 50/30/20 financial health and recommendations as loans finish or salary changes.
+*   **⏳ Future Milestone Builder**: Plan future financial events (loan payoffs, childcare, salary increments) with an optional **Auto-Reinvest Engine** that absorbs cost savings back into your compounding portfolio automatically!
+*   **💸 Real Expense Tracker & Surplus Glow-Box**: List monthly costs categorized as **Needs (Fixed)** or **Wants (Flexible)**. Computes your exact **Real Investable Surplus** with a one-click button to redirect all idle money into investments.
+*   **📁 Preset Scenario Manager**: Save, load, and manage named drafts (local scenarios) safely cached via `localStorage` sync.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 🏗️ Technical Architecture & Roadmap
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+We adhere to a highly decoupled **Vertical Slice Architecture (VSA)** under a centralized state context provider. To learn more about the inner workings, progressive formulas, and our future plans, read our dedicated wiki:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+*   **📘 [Full Technical Wiki & References (WIKI.md)](file:///Users/thunder6230/projects/investment-calculator/WIKI.md)**
+*   **💡 [Feature Roadmap Details](file:///Users/thunder6230/projects/investment-calculator/WIKI.md#-product-roadmap)**
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
+
+## 🛠️ Local Development & Installation
+
+### Prerequisites
+Make sure you have **Node.js (v18+)** and **npm** installed on your system.
+
+### Steps
+1.  **Clone or Open the workspace**:
+    ```bash
+    cd /Users/thunder6230/projects/investment-calculator
+    ```
+2.  **Install dependencies**:
+    ```bash
+    npm install
+    ```
+3.  **Launch the development server**:
+    ```bash
+    npm run dev
+    ```
+    This opens the local server (typically at `http://localhost:5173`).
+4.  **Run a production build**:
+    ```bash
+    npm run build
+    ```
+    Compiles an optimized bundle to the `dist/` directory.
