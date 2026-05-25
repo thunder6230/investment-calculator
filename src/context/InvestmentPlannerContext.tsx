@@ -68,6 +68,16 @@ export interface PlannerContextType {
   savedDrafts: Draft[];
   newDraftName: string;
   setNewDraftName: (name: string) => void;
+  activeTab: 'investments' | 'expenses' | 'copilot';
+  setActiveTab: (tab: 'investments' | 'expenses' | 'copilot') => void;
+  showAfterTax: boolean;
+  setShowAfterTax: (s: boolean) => void;
+  apiKey: string;
+  setApiKey: (k: string) => void;
+  apiProvider: 'gemini' | 'openai' | 'openrouter';
+  setApiProvider: (p: 'gemini' | 'openai' | 'openrouter') => void;
+  aiOutput: string;
+  setAiOutput: (o: string) => void;
   
   // --- Expense Tracker Builder states ---
   newExpenseName: string;
@@ -182,6 +192,15 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
 
   // Forecasting Year
   const [budgetYear, setBudgetYear] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState<'investments' | 'expenses' | 'copilot'>('investments');
+  const [showAfterTax, setShowAfterTax] = useState<boolean>(() => lastSession.showAfterTax ?? false);
+
+  // AI Copilot credentials & outputs (loaded securely from standard localStorage)
+  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('finanzat-api-key') ?? '');
+  const [apiProvider, setApiProvider] = useState<'gemini' | 'openai' | 'openrouter'>(() => {
+    return (localStorage.getItem('finanzat-api-provider') as any) ?? 'gemini';
+  });
+  const [aiOutput, setAiOutput] = useState<string>(() => localStorage.getItem('finanzat-ai-output') ?? '');
 
   // Drafts
   const [savedDrafts, setSavedDrafts] = useState<Draft[]>(() => {
@@ -215,6 +234,7 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
       milestones,
       expenseMode,
       expenseItems,
+      showAfterTax,
     };
     localStorage.setItem('investment-calculator-last-session', JSON.stringify(data));
   }, [
@@ -233,7 +253,21 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
     milestones,
     expenseMode,
     expenseItems,
+    showAfterTax,
   ]);
+
+  // AI Key syncs
+  useEffect(() => {
+    localStorage.setItem('finanzat-api-key', apiKey);
+  }, [apiKey]);
+
+  useEffect(() => {
+    localStorage.setItem('finanzat-api-provider', apiProvider);
+  }, [apiProvider]);
+
+  useEffect(() => {
+    localStorage.setItem('finanzat-ai-output', aiOutput);
+  }, [aiOutput]);
 
   // Adjust forecast timeline limits if projection years shrinks
   useEffect(() => {
@@ -273,8 +307,9 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         stepUpRate: stepUpRate / 100,
         milestones,
         baseFixedCosts: activeBaseFixedCosts,
+        marginalTaxRate: taxResult.marginalTaxRate,
       }),
-    [startCapital, monthlyInvest, juneExtra, decemberExtra, years, minRate, maxRate, stepUpRate, milestones, activeBaseFixedCosts]
+    [startCapital, monthlyInvest, juneExtra, decemberExtra, years, minRate, maxRate, stepUpRate, milestones, activeBaseFixedCosts, taxResult.marginalTaxRate]
   );
 
   const idealProjection = useMemo(
@@ -290,8 +325,9 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         stepUpRate: 0,
         milestones: [],
         baseFixedCosts: activeBaseFixedCosts,
+        marginalTaxRate: taxResult.marginalTaxRate,
       }),
-    [startCapital, taxResult.netRegularMonthly, taxResult.net13th, taxResult.net14th, years, minRate, maxRate, activeBaseFixedCosts]
+    [startCapital, taxResult.netRegularMonthly, taxResult.net13th, taxResult.net14th, years, minRate, maxRate, activeBaseFixedCosts, taxResult.marginalTaxRate]
   );
 
   const activePointForBudget = useMemo(() => {
@@ -386,6 +422,11 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         expenseMode, setExpenseMode,
         expenseItems, setExpenseItems,
         budgetYear, setBudgetYear,
+        activeTab, setActiveTab,
+        showAfterTax, setShowAfterTax,
+        apiKey, setApiKey,
+        apiProvider, setApiProvider,
+        aiOutput, setAiOutput,
         savedDrafts,
         newDraftName, setNewDraftName,
 

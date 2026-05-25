@@ -10,9 +10,12 @@ export interface Milestone {
 export interface YearDataPoint {
   year: number;
   paidIn: number;
-  low: number;   // growth at minRate
-  high: number;  // growth at maxRate
-  midpoint: number; // midpoint between low and high
+  low: number;   // growth at minRate (Gross)
+  high: number;  // growth at maxRate (Gross)
+  midpoint: number; // midpoint between low and high (Gross)
+  lowAfterTax: number;   // growth at minRate (Net of tax)
+  highAfterTax: number;  // growth at maxRate (Net of tax)
+  midpointAfterTax: number; // midpoint (Net of tax)
   // Dynamic parameters active in this year
   monthlyContribActive: number;
   juneExtraActive: number;
@@ -29,6 +32,9 @@ export interface ProjectionResult {
   monthlyPayoutLow: number;
   monthlyPayoutHigh: number;
   monthlyPayoutMid: number;
+  monthlyPayoutLowAfterTax: number;
+  monthlyPayoutHighAfterTax: number;
+  monthlyPayoutMidAfterTax: number;
 }
 
 export interface ProjectionParams {
@@ -45,12 +51,14 @@ export interface ProjectionParams {
   stepUpRate: number; // e.g. 0.02
   milestones: Milestone[];
   baseFixedCosts: number;
+  marginalTaxRate?: number; // employee personal marginal tax rate
 }
 
 /**
  * Calculate year-by-year investment projections.
  * Contributions are modelled as monthly with two additional annual top-ups.
- * Accounts for annual step-up contribution growth and dynamic expense milestones.
+ * Accounts for annual step-up contribution growth, dynamic expense milestones,
+ * and personal-income-bracket-adjusted capital gains taxation (Austrian KeSt).
  */
 export function calculateProjection(params: ProjectionParams): ProjectionResult {
   const {
@@ -64,6 +72,7 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
     stepUpRate,
     milestones,
     baseFixedCosts,
+    marginalTaxRate,
   } = params;
 
   const midRate = (minRate + maxRate) / 2;
@@ -78,6 +87,10 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
   let balHigh = startCapital;
   let totalContributed = startCapital;
 
+  // Personal marginal income rate compared to flat KeSt (27.5%)
+  const personalRate = marginalTaxRate ?? 0.3;
+  const capGainsTaxRate = Math.min(0.275, personalRate);
+
   const dataPoints: YearDataPoint[] = [
     {
       year: 0,
@@ -85,6 +98,9 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
       low: startCapital,
       high: startCapital,
       midpoint: startCapital,
+      lowAfterTax: startCapital,
+      highAfterTax: startCapital,
+      midpointAfterTax: startCapital,
       monthlyContribActive: monthlyContribution,
       juneExtraActive: juneExtra,
       decemberExtraActive: decemberExtra,
@@ -151,12 +167,25 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
       }
     }
 
+    // Calculate after-tax estimates for year-end data points
+    const lowGains = Math.max(0, balLow - totalContributed);
+    const lowAfterTax = Math.round(balLow - lowGains * capGainsTaxRate);
+
+    const highGains = Math.max(0, balHigh - totalContributed);
+    const highAfterTax = Math.round(balHigh - highGains * capGainsTaxRate);
+
+    const midGains = Math.max(0, balMid - totalContributed);
+    const midpointAfterTax = Math.round(balMid - midGains * capGainsTaxRate);
+
     dataPoints.push({
       year: y,
       paidIn: totalContributed,
       low: Math.round(balLow),
       high: Math.round(balHigh),
       midpoint: Math.round(balMid),
+      lowAfterTax,
+      highAfterTax,
+      midpointAfterTax,
       monthlyContribActive,
       juneExtraActive,
       decemberExtraActive,
@@ -166,11 +195,24 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
     });
   }
 
-  // Average monthly income if you draw down the portfolio over the remaining life expectancy
-  // Here we offer a simple "monthly equivalent" = final value / (years * 12) for illustration
+  // Liquidated after-tax amounts
+  const finalLowGains = Math.max(0, balLow - totalContributed);
+  const finalLowAfterTax = balLow - finalLowGains * capGainsTaxRate;
+
+  const finalHighGains = Math.max(0, balHigh - totalContributed);
+  const finalHighAfterTax = balHigh - finalHighGains * capGainsTaxRate;
+
+  const finalMidGains = Math.max(0, balMid - totalContributed);
+  const finalMidPointAfterTax = balMid - finalMidGains * capGainsTaxRate;
+
+  // Average monthly equivalent drawdowns
   const monthlyPayoutLow = balLow / (years * 12);
   const monthlyPayoutHigh = balHigh / (years * 12);
   const monthlyPayoutMid = balMid / (years * 12);
+
+  const monthlyPayoutLowAfterTax = finalLowAfterTax / (years * 12);
+  const monthlyPayoutHighAfterTax = finalHighAfterTax / (years * 12);
+  const monthlyPayoutMidAfterTax = finalMidPointAfterTax / (years * 12);
 
   return {
     dataPoints,
@@ -178,6 +220,9 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
     monthlyPayoutLow: Math.round(monthlyPayoutLow),
     monthlyPayoutHigh: Math.round(monthlyPayoutHigh),
     monthlyPayoutMid: Math.round(monthlyPayoutMid),
+    monthlyPayoutLowAfterTax: Math.round(monthlyPayoutLowAfterTax),
+    monthlyPayoutHighAfterTax: Math.round(monthlyPayoutHighAfterTax),
+    monthlyPayoutMidAfterTax: Math.round(monthlyPayoutMidAfterTax),
   };
 }
 

@@ -16,6 +16,7 @@ export interface TaxResult {
   incomeTax: number;
   socialSecurity: number;
   effectiveTaxRate: number;
+  marginalTaxRate: number; // Austrian personal marginal tax rate
 }
 
 /** Austrian social security contribution rates for employees (2025, approx.) */
@@ -65,6 +66,16 @@ export function calculateAustrianNetIncome(grossYearly: number): TaxResult {
   const netYearly = grossYearly - socialSecurity - totalTax;
   const netMonthly = netYearly / 12;
 
+  // Compute personal marginal tax rate
+  let marginalTaxRate = 0;
+  if (regularTaxable <= 12_816) marginalTaxRate = 0;
+  else if (regularTaxable <= 20_818) marginalTaxRate = 0.20;
+  else if (regularTaxable <= 34_513) marginalTaxRate = 0.30;
+  else if (regularTaxable <= 66_612) marginalTaxRate = 0.41;
+  else if (regularTaxable <= 99_266) marginalTaxRate = 0.48;
+  else if (regularTaxable <= 1_000_000) marginalTaxRate = 0.50;
+  else marginalTaxRate = 0.55;
+
   return {
     grossYearly,
     netYearly,
@@ -75,5 +86,6 @@ export function calculateAustrianNetIncome(grossYearly: number): TaxResult {
     incomeTax: totalTax,
     socialSecurity,
     effectiveTaxRate: (socialSecurity + totalTax) / grossYearly,
+    marginalTaxRate,
   };
 }

@@ -2,7 +2,7 @@ import { useInvestmentPlanner } from '../../context/InvestmentPlannerContext';
 import { formatCurrency } from './projectionEngine';
 
 export default function ProjectionTable() {
-  const { projection, minRate, maxRate } = useInvestmentPlanner();
+  const { projection, minRate, maxRate, showAfterTax } = useInvestmentPlanner();
 
   return (
     <div className="card">
@@ -15,9 +15,9 @@ export default function ProjectionTable() {
               <th>Monthly Invest</th>
               <th>Fixed Costs</th>
               <th>Paid In</th>
-              <th>@ {minRate}%</th>
-              <th>Midpoint</th>
-              <th>@ {maxRate}%</th>
+              <th>@ {minRate}% {showAfterTax ? '(Net)' : '(Gross)'}</th>
+              <th>Midpoint {showAfterTax ? '(Net)' : '(Gross)'}</th>
+              <th>@ {maxRate}% {showAfterTax ? '(Net)' : '(Gross)'}</th>
               <th>Triggered Events</th>
             </tr>
           </thead>
@@ -37,9 +37,9 @@ export default function ProjectionTable() {
                   <td>{d.year === 0 ? '—' : formatCurrency(d.monthlyContribActive)}</td>
                   <td>{formatCurrency(d.fixedCostsActive)}</td>
                   <td>{formatCurrency(d.paidIn)}</td>
-                  <td>{formatCurrency(d.low)}</td>
-                  <td>{formatCurrency(d.midpoint)}</td>
-                  <td>{formatCurrency(d.high)}</td>
+                  <td>{formatCurrency(showAfterTax ? d.lowAfterTax : d.low)}</td>
+                  <td>{formatCurrency(showAfterTax ? d.midpointAfterTax : d.midpoint)}</td>
+                  <td>{formatCurrency(showAfterTax ? d.highAfterTax : d.high)}</td>
                   <td style={{ textAlign: 'left', fontSize: '0.74rem' }}>
                     {isTriggered ? (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
