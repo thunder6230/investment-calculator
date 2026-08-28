@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 interface Props {
@@ -23,6 +24,42 @@ export default function NumberInput({
   hint,
   headerRight,
 }: Props) {
+  const [localValue, setLocalValue] = useState<string | null>(null);
+
+  // When focused and typing, show localValue. Otherwise, show external value cleanly formatted.
+  const displayValue = localValue !== null ? localValue : (value === 0 ? '0' : String(Number(value.toFixed(2))));
+
+  const handleFocus = () => {
+    setLocalValue(value === 0 ? '0' : String(Number(value.toFixed(2))));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setLocalValue(raw);
+
+    if (raw === '' || raw === '-') {
+      onChange(min);
+      return;
+    }
+
+    const num = Number(raw);
+    if (!isNaN(num)) {
+      onChange(Math.max(min, num));
+    }
+  };
+
+  const handleBlur = () => {
+    if (localValue !== null) {
+      if (localValue === '' || isNaN(Number(localValue))) {
+        onChange(min);
+      } else {
+        const num = Math.max(min, Number(localValue));
+        onChange(num);
+      }
+      setLocalValue(null);
+    }
+  };
+
   return (
     <div className="number-input-group">
       <div className="input-header">
@@ -35,8 +72,10 @@ export default function NumberInput({
           type="number"
           min={min}
           step={step}
-          value={value}
-          onChange={(e) => onChange(Math.max(min, Number(e.target.value)))}
+          value={displayValue}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           className="number-input"
         />
         {suffix && <span className="input-adornment input-suffix">{suffix}</span>}

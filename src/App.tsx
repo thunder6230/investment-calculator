@@ -1,4 +1,5 @@
 import { InvestmentPlannerProvider, useInvestmentPlanner } from './context/InvestmentPlannerContext';
+import CountryProfileCard from './features/tax/CountryProfileCard';
 import ScenarioManager from './features/scenarios/ScenarioManager';
 import TaxSection from './features/tax/TaxSection';
 import InvestmentInputs from './features/projection/InvestmentInputs';
@@ -9,6 +10,9 @@ import ProjectionChart from './features/projection/ProjectionChart';
 import ProjectionTable from './features/projection/ProjectionTable';
 import ExpenseTracker from './features/expenses/ExpenseTracker';
 import ExpenseBreakdown from './features/expenses/ExpenseBreakdown';
+import FIRESection from './features/fire/FIRESection';
+import GoalSolverModal from './features/goals/GoalSolverModal';
+import ScenarioCompareModal from './features/scenarios/ScenarioCompareModal';
 import AICopilotConsole from './features/copilot/AICopilotConsole';
 import './App.css';
 
@@ -52,6 +56,13 @@ function MainLayout() {
               <span className="navbar-label">Expenses &amp; Budget</span>
             </button>
             <button
+              className={`navbar-item ${activeTab === 'fire' ? 'active' : ''}`}
+              onClick={() => setActiveTab('fire')}
+            >
+              <span className="navbar-icon">🔥</span>
+              <span className="navbar-label">FIRE &amp; Freedom</span>
+            </button>
+            <button
               className={`navbar-item ${activeTab === 'copilot' ? 'active' : ''}`}
               onClick={() => setActiveTab('copilot')}
             >
@@ -72,6 +83,7 @@ function MainLayout() {
           {activeTab === 'investments' && (
             <div className="layout">
               <aside className="panel panel-inputs">
+                <CountryProfileCard />
                 <ScenarioManager />
                 <TaxSection />
                 <InvestmentInputs />
@@ -89,6 +101,7 @@ function MainLayout() {
           {activeTab === 'expenses' && (
             <div className="layout">
               <aside className="panel panel-inputs">
+                <CountryProfileCard />
                 <ExpenseTracker />
               </aside>
 
@@ -99,11 +112,29 @@ function MainLayout() {
             </div>
           )}
 
+          {activeTab === 'fire' && (
+            <div className="layout">
+              <aside className="panel panel-inputs">
+                <CountryProfileCard />
+                <TaxSection />
+                <InvestmentInputs />
+              </aside>
+
+              <main className="panel panel-results">
+                <FIRESection />
+              </main>
+            </div>
+          )}
+
           {activeTab === 'copilot' && (
             <AICopilotConsole />
           )}
         </div>
       </div>
+
+      {/* Global Modals */}
+      <GoalSolverModal />
+      <ScenarioCompareModal />
     </div>
   );
 }

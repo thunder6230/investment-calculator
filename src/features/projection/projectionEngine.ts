@@ -63,6 +63,22 @@ export interface ProjectionParams {
   extraInvestments?: ExtraInvestmentEvent[];
   baseFixedCosts: number;
   marginalTaxRate?: number; // employee personal marginal tax rate
+  taxShieldMode?: boolean; // When true, models tax-sheltered growth (e.g. 0% KeSt / TBSZ)
+}
+
+export interface FireMetrics {
+  annualExpenses: number;
+  monthlyExpenses: number;
+  swr: number; // e.g. 0.04 (4%)
+  targetFireNumber: number; // annualExpenses / swr
+  leanFireNumber: number; // 0.75 * targetFireNumber
+  fatFireNumber: number; // 1.25 * targetFireNumber
+  coastFireNumber: number; // targetFireNumber / (1 + r)^years
+  freedomYear: number | null; // year where midpoint >= targetFireNumber
+  currentProgressPercent: number; // (startCapital / targetFireNumber) * 100
+  endProgressPercent: number; // (finalMidpoint / targetFireNumber) * 100
+  monthlyPassiveIncomeAtEnd: number; // (finalMidpoint * swr) / 12
+  isFireAchieved: boolean;
 }
 
 /**
@@ -70,7 +86,7 @@ export interface ProjectionParams {
  * Contributions are modelled as monthly with two additional annual top-ups.
  * Accounts for annual step-up contribution growth, dynamic expense milestones,
  * extra lump-sum / recurring investment events,
- * and personal-income-bracket-adjusted capital gains taxation (Austrian KeSt).
+ * and personal-income-bracket-adjusted capital gains taxation (Austrian KeSt or TBSZ shield).
  */
 export function calculateProjection(params: ProjectionParams): ProjectionResult {
   const {
@@ -86,6 +102,7 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
     extraInvestments = [],
     baseFixedCosts,
     marginalTaxRate,
+    taxShieldMode = false,
   } = params;
 
   const midRate = (minRate + maxRate) / 2;
@@ -100,9 +117,9 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
   let balHigh = startCapital;
   let totalContributed = startCapital;
 
-  // Personal marginal income rate compared to flat KeSt (27.5%)
+  // Personal marginal income rate compared to flat KeSt (27.5%), or 0% if tax-shielded (e.g. TBSZ / tax shelter)
   const personalRate = marginalTaxRate ?? 0.3;
-  const capGainsTaxRate = Math.min(0.275, personalRate);
+  const capGainsTaxRate = taxShieldMode ? 0 : Math.min(0.275, personalRate);
 
   const dataPoints: YearDataPoint[] = [
     {
@@ -271,4 +288,104 @@ export function formatCurrency(value: number): string {
     currency: 'EUR',
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+/**
+ * Calculates FIRE (Financial Independence / Retire Early) milestones and metrics
+ */
+export function calculateFireMetrics(
+  monthlyExpenses: number,
+  swr: number,
+  startCapital: number,
+  dataPoints: YearDataPoint[],
+  years: number,
+  growthRate: number = 0.065
+): FireMetrics {
+  const safeMonthlyExpenses = Math.max(1, monthlyExpenses);
+  const annualExpenses = safeMonthlyExpenses * 12;
+  const safeSwr = Math.max(0.01, swr);
+  const targetFireNumber = Math.round(annualExpenses / safeSwr);
+  const leanFireNumber = Math.round(targetFireNumber * 0.75);
+  const fatFireNumber = Math.round(targetFireNumber * 1.25);
+  const coastFireNumber = Math.round(targetFireNumber / Math.pow(1 + growthRate, Math.max(1, years)));
+
+  let freedomYear: number | null = null;
+  for (const dp of dataPoints) {
+    if (dp.midpoint >= targetFireNumber && freedomYear === null && dp.year > 0) {
+      freedomYear = dp.year;
+      break;
+    }
+  }
+
+  const finalPoint = dataPoints[dataPoints.length - 1];
+  const finalVal = finalPoint ? finalPoint.midpoint : startCapital;
+  const currentProgressPercent = Math.min(100, Math.round((startCapital / targetFireNumber) * 100));
+  const endProgressPercent = Math.min(200, Math.round((finalVal / targetFireNumber) * 100));
+  const monthlyPassiveIncomeAtEnd = Math.round((finalVal * safeSwr) / 12);
+
+  return {
+    annualExpenses,
+    monthlyExpenses: safeMonthlyExpenses,
+    swr: safeSwr,
+    targetFireNumber,
+    leanFireNumber,
+    fatFireNumber,
+    coastFireNumber,
+    freedomYear,
+    currentProgressPercent,
+    endProgressPercent,
+    monthlyPassiveIncomeAtEnd,
+    isFireAchieved: freedomYear !== null,
+  };
+}
+
+/**
+ * Reverse Goal Solver: Solves for required monthly investment to hit a target wealth
+ */
+export function solveRequiredContribution(
+  targetCapital: number,
+  targetYears: number,
+  startCapital: number,
+  rate: number = 0.065,
+  juneBonus: number = 0,
+  decemberBonus: number = 0
+): number {
+  if (targetYears <= 0 || targetCapital <= 0) return 0;
+  
+  // Quick check if initial capital alone compound-hits target
+  const futureStartCap = startCapital * Math.pow(1 + rate, targetYears);
+  if (futureStartCap >= targetCapital) return 0;
+
+  const monthlyRate = Math.pow(1 + rate, 1 / 12) - 1;
+  let low = 0;
+  let high = Math.max(20000, targetCapital / (targetYears * 12));
+  let result = high;
+
+  for (let iter = 0; iter < 50; iter++) {
+    const mid = (low + high) / 2;
+    let bal = startCapital;
+    for (let y = 1; y <= targetYears; y++) {
+      for (let m = 1; m <= 12; m++) {
+        bal = bal * (1 + monthlyRate) + mid;
+        if (m === 6) bal += juneBonus;
+        if (m === 12) bal += decemberBonus;
+      }
+    }
+    if (bal >= targetCapital) {
+      result = mid;
+      high = mid;
+    } else {
+      low = mid;
+    }
+  }
+
+  return Math.max(0, Math.round(result));
+}
+
+/**
+ * Discount a nominal future value to real purchasing power today
+ */
+export function discountByInflation(value: number, inflationRate: number, years: number): number {
+  if (inflationRate <= 0 || years <= 0) return value;
+  return Math.round(value / Math.pow(1 + inflationRate, years));
 }

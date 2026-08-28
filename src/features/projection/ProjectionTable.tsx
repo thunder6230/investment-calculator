@@ -2,11 +2,91 @@ import { useInvestmentPlanner } from '../../context/InvestmentPlannerContext';
 import { formatCurrency } from './projectionEngine';
 
 export default function ProjectionTable() {
-  const { projection, minRate, maxRate, showAfterTax } = useInvestmentPlanner();
+  const {
+    displayProjection,
+    minRate,
+    maxRate,
+    showAfterTax,
+    adjustForInflation,
+    inflationRate,
+    country,
+  } = useInvestmentPlanner();
+
+  const handleExportCSV = () => {
+    const headers = [
+      'Year',
+      'Monthly_Invest_EUR',
+      'Fixed_Costs_EUR',
+      'Paid_In_EUR',
+      `Low_${minRate}pct_EUR`,
+      'Midpoint_EUR',
+      `High_${maxRate}pct_EUR`,
+      'Events_Triggered',
+    ];
+
+    const rows = displayProjection.dataPoints.map((d) => {
+      const milestonesStr = d.milestonesTriggered?.map((m) => `${m.name} (${m.type})`).join('; ') || '';
+      const eventsStr = d.extraInvestmentsActive?.map((e) => `${e.name} (+${e.amount})`).join('; ') || '';
+      const combinedEvents = [milestonesStr, eventsStr].filter(Boolean).join(' | ');
+
+      return [
+        d.year,
+        d.monthlyContribActive,
+        d.fixedCostsActive,
+        d.paidIn,
+        showAfterTax ? d.lowAfterTax : d.low,
+        showAfterTax ? d.midpointAfterTax : d.midpoint,
+        showAfterTax ? d.highAfterTax : d.high,
+        `"${combinedEvents}"`,
+      ].join(',');
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `financial_projection_${country.toLowerCase()}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <div className="card">
-      <h2 className="section-title">Year-by-Year Breakdown</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+        <div>
+          <h2 className="section-title" style={{ marginBottom: 0 }}>Year-by-Year Breakdown</h2>
+          {adjustForInflation && (
+            <span style={{ fontSize: '0.70rem', color: 'var(--yellow)' }}>
+              (Values adjusted for {inflationRate}% annual inflation purchasing power)
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', fontWeight: '600' }}
+            onClick={handleExportCSV}
+          >
+            📥 Export CSV
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', fontWeight: '600' }}
+            onClick={handlePrint}
+          >
+            🖨️ Print / PDF
+          </button>
+        </div>
+      </div>
+
       <div className="table-scroll">
         <table className="data-table">
           <thead>
@@ -22,7 +102,7 @@ export default function ProjectionTable() {
             </tr>
           </thead>
           <tbody>
-            {projection.dataPoints.map((d) => {
+            {displayProjection.dataPoints.map((d) => {
               const hasMilestone = d.milestonesTriggered && d.milestonesTriggered.length > 0;
               const hasExtraEvent = d.extraInvestmentsActive && d.extraInvestmentsActive.length > 0;
               const isTriggered = hasMilestone || hasExtraEvent;

@@ -5,7 +5,6 @@ import { formatCurrency } from '../projection/projectionEngine';
 export default function TaxSection() {
   const {
     country,
-    setCountry,
     salaryPeriod,
     setSalaryPeriod,
     grossMonthly,
@@ -18,14 +17,14 @@ export default function TaxSection() {
   } = useInvestmentPlanner();
 
   const salaryMultiplier = country === 'AT' ? 14 : 12;
-  const grossYearlyValue = Math.round(grossMonthly * salaryMultiplier * 100) / 100;
+  const grossYearlyValue = Number((grossMonthly * salaryMultiplier).toFixed(2));
   const currentSalaryValue = salaryPeriod === 'monthly' ? grossMonthly : grossYearlyValue;
 
   const handleSalaryChange = (val: number) => {
     if (salaryPeriod === 'monthly') {
       setGrossMonthly(val);
     } else {
-      setGrossMonthly(Math.round((val / salaryMultiplier) * 100) / 100);
+      setGrossMonthly(val / salaryMultiplier);
     }
   };
 
@@ -70,43 +69,7 @@ export default function TaxSection() {
 
   return (
     <section className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2 className="section-title" style={{ marginBottom: 0 }}>💼 Income &amp; Tax</h2>
-        <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--surface2)', padding: '0.25rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
-          <button
-            onClick={() => setCountry('AT')}
-            style={{
-              padding: '0.25rem 0.6rem',
-              fontSize: '0.75rem',
-              fontWeight: '700',
-              borderRadius: '4px',
-              border: 'none',
-              background: country === 'AT' ? 'var(--blue)' : 'transparent',
-              color: country === 'AT' ? '#ffffff' : 'var(--muted)',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            🇦🇹 Austria (AT)
-          </button>
-          <button
-            onClick={() => setCountry('HU')}
-            style={{
-              padding: '0.25rem 0.6rem',
-              fontSize: '0.75rem',
-              fontWeight: '700',
-              borderRadius: '4px',
-              border: 'none',
-              background: country === 'HU' ? 'var(--blue)' : 'transparent',
-              color: country === 'HU' ? '#ffffff' : 'var(--muted)',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            🇭🇺 Hungary (HU)
-          </button>
-        </div>
-      </div>
+      <h2 className="section-title">💼 Income &amp; Salary Breakdown</h2>
 
       <NumberInput
         label={

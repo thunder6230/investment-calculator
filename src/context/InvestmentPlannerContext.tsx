@@ -1,8 +1,18 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import type { TaxResult, Country } from '../features/tax/taxCalculator';
 import { calculateNetIncome } from '../features/tax/taxCalculator';
-import type { Milestone, ExtraInvestmentEvent, YearDataPoint, ProjectionResult } from '../features/projection/projectionEngine';
-import { calculateProjection, yearlyContribution } from '../features/projection/projectionEngine';
+import type {
+  Milestone,
+  ExtraInvestmentEvent,
+  YearDataPoint,
+  ProjectionResult,
+  FireMetrics,
+} from '../features/projection/projectionEngine';
+import {
+  calculateProjection,
+  yearlyContribution,
+  calculateFireMetrics,
+} from '../features/projection/projectionEngine';
 
 export interface ExpenseItem {
   id: string;
@@ -34,6 +44,9 @@ export interface Draft {
   zuschlagMonthly?: number;
   zuschlagSvsSubject?: boolean;
   extraInvestments?: ExtraInvestmentEvent[];
+  adjustForInflation?: boolean;
+  inflationRate?: number;
+  taxShieldMode?: boolean;
 }
 
 export interface PlannerContextType {
@@ -83,10 +96,27 @@ export interface PlannerContextType {
   savedDrafts: Draft[];
   newDraftName: string;
   setNewDraftName: (name: string) => void;
-  activeTab: 'investments' | 'expenses' | 'copilot';
-  setActiveTab: (tab: 'investments' | 'expenses' | 'copilot') => void;
+  activeTab: 'investments' | 'expenses' | 'fire' | 'copilot';
+  setActiveTab: (tab: 'investments' | 'expenses' | 'fire' | 'copilot') => void;
   showAfterTax: boolean;
   setShowAfterTax: (s: boolean) => void;
+  
+  // --- New Financial Features States ---
+  adjustForInflation: boolean;
+  setAdjustForInflation: (v: boolean) => void;
+  inflationRate: number;
+  setInflationRate: (v: number) => void;
+  safeWithdrawalRate: number;
+  setSafeWithdrawalRate: (v: number) => void;
+  taxShieldMode: boolean;
+  setTaxShieldMode: (v: boolean) => void;
+  isGoalSolverOpen: boolean;
+  setIsGoalSolverOpen: (v: boolean) => void;
+  isCompareModalOpen: boolean;
+  setIsCompareModalOpen: (v: boolean) => void;
+  comparedDraftName: string | null;
+  setComparedDraftName: (name: string | null) => void;
+
   apiKey: string;
   setApiKey: (k: string) => void;
   apiProvider: 'gemini' | 'openai' | 'openrouter';
@@ -131,7 +161,11 @@ export interface PlannerContextType {
   activeBaseFixedCosts: number;
   investableSurplus: number;
   projection: ProjectionResult;
+  displayProjection: ProjectionResult;
   idealProjection: ProjectionResult;
+  fireMetrics: FireMetrics;
+  comparedDraft: Draft | null;
+  comparedProjection: ProjectionResult | null;
   activeFixedCosts: number;
   activeMonthlyInvest: number;
   activeTotalMonthlySavings: number;
@@ -146,6 +180,7 @@ export interface PlannerContextType {
   handleSaveDraft: () => void;
   handleLoadDraft: (name: string) => void;
   handleDeleteDraft: (name: string) => void;
+  handleApplyGoalSolution: (monthlyAmount: number, yearsCount: number) => void;
 }
 
 const PlannerContext = createContext<PlannerContextType | undefined>(undefined);
@@ -201,6 +236,17 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
   const [newMilestoneStartYear, setNewMilestoneStartYear] = useState<number>(5);
   const [newMilestoneReinvest, setNewMilestoneReinvest] = useState<boolean>(true);
 
+  // ── Inflation, FIRE, Tax Shields & Modal states ────────────────────────
+  const [adjustForInflation, setAdjustForInflation] = useState<boolean>(() => lastSession.adjustForInflation ?? false);
+  const [inflationRate, setInflationRate] = useState<number>(() => lastSession.inflationRate ?? 2.0);
+  const [safeWithdrawalRate, setSafeWithdrawalRate] = useState<number>(() => lastSession.safeWithdrawalRate ?? 4.0);
+  const [taxShieldMode, setTaxShieldMode] = useState<boolean>(() => lastSession.taxShieldMode ?? false);
+  
+  // Modals & Comparison
+  const [isGoalSolverOpen, setIsGoalSolverOpen] = useState<boolean>(false);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
+  const [comparedDraftName, setComparedDraftName] = useState<string | null>(null);
+
   // ── Extra Investment Events ──────────────────────────────────────────────
   const [extraInvestments, setExtraInvestments] = useState<ExtraInvestmentEvent[]>(() => {
     if (lastSession.extraInvestments) return lastSession.extraInvestments;
@@ -240,7 +286,7 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
 
   // Forecasting Year
   const [budgetYear, setBudgetYear] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState<'investments' | 'expenses' | 'copilot'>('investments');
+  const [activeTab, setActiveTab] = useState<'investments' | 'expenses' | 'fire' | 'copilot'>('investments');
   const [showAfterTax, setShowAfterTax] = useState<boolean>(() => lastSession.showAfterTax ?? false);
 
   // AI Copilot credentials & outputs (loaded securely from standard localStorage)
@@ -288,6 +334,10 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
       expenseMode,
       expenseItems,
       showAfterTax,
+      adjustForInflation,
+      inflationRate,
+      safeWithdrawalRate,
+      taxShieldMode,
     };
     localStorage.setItem('investment-calculator-last-session', JSON.stringify(data));
   }, [
@@ -312,6 +362,10 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
     expenseMode,
     expenseItems,
     showAfterTax,
+    adjustForInflation,
+    inflationRate,
+    safeWithdrawalRate,
+    taxShieldMode,
   ]);
 
   // AI Key syncs
@@ -362,9 +416,53 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         extraInvestments,
         baseFixedCosts: activeBaseFixedCosts,
         marginalTaxRate: taxResult.marginalTaxRate,
+        taxShieldMode,
       }),
-    [startCapital, monthlyInvest, juneExtra, decemberExtra, years, minRate, maxRate, stepUpRate, milestones, extraInvestments, activeBaseFixedCosts, taxResult.marginalTaxRate]
+    [
+      startCapital,
+      monthlyInvest,
+      juneExtra,
+      decemberExtra,
+      years,
+      minRate,
+      maxRate,
+      stepUpRate,
+      milestones,
+      extraInvestments,
+      activeBaseFixedCosts,
+      taxResult.marginalTaxRate,
+      taxShieldMode,
+    ]
   );
+
+  // Projection with Inflation Purchasing Power discount applied if enabled
+  const displayProjection = useMemo(() => {
+    if (!adjustForInflation || inflationRate <= 0) return projection;
+    const infDecimal = inflationRate / 100;
+    const discountedDataPoints = projection.dataPoints.map((dp) => {
+      const discount = Math.pow(1 + infDecimal, dp.year);
+      return {
+        ...dp,
+        paidIn: Math.round(dp.paidIn / discount),
+        low: Math.round(dp.low / discount),
+        high: Math.round(dp.high / discount),
+        midpoint: Math.round(dp.midpoint / discount),
+        lowAfterTax: Math.round(dp.lowAfterTax / discount),
+        highAfterTax: Math.round(dp.highAfterTax / discount),
+        midpointAfterTax: Math.round(dp.midpointAfterTax / discount),
+      };
+    });
+    return {
+      ...projection,
+      dataPoints: discountedDataPoints,
+      monthlyPayoutLow: Math.round(projection.monthlyPayoutLow / Math.pow(1 + infDecimal, years)),
+      monthlyPayoutHigh: Math.round(projection.monthlyPayoutHigh / Math.pow(1 + infDecimal, years)),
+      monthlyPayoutMid: Math.round(projection.monthlyPayoutMid / Math.pow(1 + infDecimal, years)),
+      monthlyPayoutLowAfterTax: Math.round(projection.monthlyPayoutLowAfterTax / Math.pow(1 + infDecimal, years)),
+      monthlyPayoutHighAfterTax: Math.round(projection.monthlyPayoutHighAfterTax / Math.pow(1 + infDecimal, years)),
+      monthlyPayoutMidAfterTax: Math.round(projection.monthlyPayoutMidAfterTax / Math.pow(1 + infDecimal, years)),
+    };
+  }, [projection, adjustForInflation, inflationRate, years]);
 
   const idealProjection = useMemo(
     () =>
@@ -381,9 +479,47 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         extraInvestments: [],
         baseFixedCosts: activeBaseFixedCosts,
         marginalTaxRate: taxResult.marginalTaxRate,
+        taxShieldMode,
       }),
-    [startCapital, taxResult.netRegularMonthly, taxResult.net13th, taxResult.net14th, years, minRate, maxRate, activeBaseFixedCosts, taxResult.marginalTaxRate]
+    [startCapital, taxResult.netRegularMonthly, taxResult.net13th, taxResult.net14th, years, minRate, maxRate, activeBaseFixedCosts, taxResult.marginalTaxRate, taxShieldMode]
   );
+
+  // ── FIRE calculation ──────────────────────────────────────────────────────
+  const totalMonthlyExpenses = activeBaseFixedCosts + totalDetailedWants;
+  const fireMetrics = useMemo(() => {
+    return calculateFireMetrics(
+      totalMonthlyExpenses > 0 ? totalMonthlyExpenses : fixedCosts,
+      safeWithdrawalRate / 100,
+      startCapital,
+      projection.dataPoints,
+      years,
+      (minRate + maxRate) / 200
+    );
+  }, [totalMonthlyExpenses, fixedCosts, safeWithdrawalRate, startCapital, projection.dataPoints, years, minRate, maxRate]);
+
+  // ── Compared Draft calculations ──────────────────────────────────────────
+  const comparedDraft = useMemo(() => {
+    if (!comparedDraftName) return null;
+    return savedDrafts.find((d) => d.name === comparedDraftName) ?? null;
+  }, [comparedDraftName, savedDrafts]);
+
+  const comparedProjection = useMemo(() => {
+    if (!comparedDraft) return null;
+    return calculateProjection({
+      startCapital: comparedDraft.startCapital,
+      monthlyContribution: comparedDraft.monthlyInvest,
+      juneExtra: comparedDraft.juneExtra,
+      decemberExtra: comparedDraft.decemberExtra,
+      years: comparedDraft.years,
+      minRate: comparedDraft.minRate / 100,
+      maxRate: comparedDraft.maxRate / 100,
+      stepUpRate: (comparedDraft.stepUpRate ?? 0) / 100,
+      milestones: comparedDraft.milestones ?? [],
+      extraInvestments: comparedDraft.extraInvestments ?? [],
+      baseFixedCosts: comparedDraft.fixedCosts,
+      taxShieldMode: comparedDraft.taxShieldMode,
+    });
+  }, [comparedDraft]);
 
   const activePointForBudget = useMemo(() => {
     return projection.dataPoints.find((dp) => dp.year === effectiveBudgetYear) || projection.dataPoints[0];
@@ -429,6 +565,9 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
       country,
       zuschlagMonthly,
       zuschlagSvsSubject,
+      adjustForInflation,
+      inflationRate,
+      taxShieldMode,
     };
     const updated = [newDraft, ...savedDrafts.filter((d) => d.name !== newDraft.name)];
     setSavedDrafts(updated);
@@ -459,6 +598,9 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
       setExtraInvestments(found.extraInvestments ?? []);
       setExpenseMode(found.expenseMode ?? 'simple');
       setExpenseItems(found.expenseItems ?? []);
+      if (found.adjustForInflation !== undefined) setAdjustForInflation(found.adjustForInflation);
+      if (found.inflationRate !== undefined) setInflationRate(found.inflationRate);
+      if (found.taxShieldMode !== undefined) setTaxShieldMode(found.taxShieldMode);
     }
   };
 
@@ -466,6 +608,12 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
     const updated = savedDrafts.filter((d) => d.name !== name);
     setSavedDrafts(updated);
     localStorage.setItem('investment-calculator-drafts', JSON.stringify(updated));
+  };
+
+  const handleApplyGoalSolution = (monthlyAmount: number, yearsCount: number) => {
+    setMonthlyInvest(monthlyAmount);
+    setYears(yearsCount);
+    setIsGoalSolverOpen(false);
   };
 
   return (
@@ -494,6 +642,15 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         budgetYear, setBudgetYear,
         activeTab, setActiveTab,
         showAfterTax, setShowAfterTax,
+
+        adjustForInflation, setAdjustForInflation,
+        inflationRate, setInflationRate,
+        safeWithdrawalRate, setSafeWithdrawalRate,
+        taxShieldMode, setTaxShieldMode,
+        isGoalSolverOpen, setIsGoalSolverOpen,
+        isCompareModalOpen, setIsCompareModalOpen,
+        comparedDraftName, setComparedDraftName,
+
         apiKey, setApiKey,
         apiProvider, setApiProvider,
         aiOutput, setAiOutput,
@@ -521,7 +678,11 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         activeBaseFixedCosts,
         investableSurplus,
         projection,
+        displayProjection,
         idealProjection,
+        fireMetrics,
+        comparedDraft,
+        comparedProjection,
         activeFixedCosts,
         activeMonthlyInvest,
         activeTotalMonthlySavings,
@@ -535,6 +696,7 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         handleSaveDraft,
         handleLoadDraft,
         handleDeleteDraft,
+        handleApplyGoalSolution,
       }}
     >
       {children}

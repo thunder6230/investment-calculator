@@ -8,11 +8,24 @@ export default function ScenarioManager() {
     handleSaveDraft,
     handleLoadDraft,
     handleDeleteDraft,
+    setIsCompareModalOpen,
   } = useInvestmentPlanner();
 
   return (
     <section className="card drafts-card">
-      <h2 className="section-title">📁 Saved Scenarios (Local Drafts)</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <h2 className="section-title" style={{ marginBottom: 0 }}>📁 Saved Scenarios</h2>
+        {savedDrafts.length > 0 && (
+          <button
+            type="button"
+            className="badge"
+            style={{ cursor: 'pointer', background: 'var(--surface2)', color: 'var(--blue)', border: '1px solid var(--border)' }}
+            onClick={() => setIsCompareModalOpen(true)}
+          >
+            👥 Compare Scenarios
+          </button>
+        )}
+      </div>
       <div className="drafts-row" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <select
           className="drafts-select"
