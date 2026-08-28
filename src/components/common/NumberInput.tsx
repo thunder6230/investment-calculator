@@ -9,14 +9,25 @@ interface Props {
   suffix?: string;
   step?: number;
   hint?: ReactNode;
+  headerRight?: ReactNode;
 }
 
-export default function NumberInput({ label, value, onChange, min = 0, prefix, suffix, step = 1, hint }: Props) {
+export default function NumberInput({
+  label,
+  value,
+  onChange,
+  min = 0,
+  prefix,
+  suffix,
+  step = 1,
+  hint,
+  headerRight,
+}: Props) {
   return (
     <div className="number-input-group">
       <div className="input-header">
         <label className="input-label">{label}</label>
-        {hint && <div className="input-hint">{hint}</div>}
+        {headerRight ? headerRight : (hint && <div className="input-hint">{hint}</div>)}
       </div>
       <div className="input-wrapper">
         {prefix && <span className="input-adornment">{prefix}</span>}
@@ -30,6 +41,11 @@ export default function NumberInput({ label, value, onChange, min = 0, prefix, s
         />
         {suffix && <span className="input-adornment input-suffix">{suffix}</span>}
       </div>
+      {headerRight && hint && (
+        <div className="input-hint" style={{ marginTop: '0.3rem', textAlign: 'right' }}>
+          {hint}
+        </div>
+      )}
     </div>
   );
 }

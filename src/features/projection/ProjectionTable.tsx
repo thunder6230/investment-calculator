@@ -23,13 +23,16 @@ export default function ProjectionTable() {
           </thead>
           <tbody>
             {projection.dataPoints.map((d) => {
-              const isTriggered = d.milestonesTriggered && d.milestonesTriggered.length > 0;
+              const hasMilestone = d.milestonesTriggered && d.milestonesTriggered.length > 0;
+              const hasExtraEvent = d.extraInvestmentsActive && d.extraInvestmentsActive.length > 0;
+              const isTriggered = hasMilestone || hasExtraEvent;
+
               return (
                 <tr
                   key={d.year}
                   style={
                     isTriggered
-                      ? { background: 'rgba(74, 222, 128, 0.08)', borderLeft: '3px solid var(--green)' }
+                      ? { background: 'rgba(96, 165, 250, 0.08)', borderLeft: '3px solid var(--blue)' }
                       : undefined
                   }
                 >
@@ -43,7 +46,7 @@ export default function ProjectionTable() {
                   <td style={{ textAlign: 'left', fontSize: '0.74rem' }}>
                     {isTriggered ? (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                        {d.milestonesTriggered.map((m) => (
+                        {hasMilestone && d.milestonesTriggered.map((m) => (
                           <span
                             key={m.id}
                             style={{
@@ -58,6 +61,24 @@ export default function ProjectionTable() {
                             }}
                           >
                             {m.type === 'decrease' ? '🎉' : '⚠️'} {m.name} ({m.type === 'decrease' ? '+' : '-'}{formatCurrency(m.amount)}/mo {m.reinvest ? 'reinvested' : 'saved'})
+                          </span>
+                        ))}
+
+                        {hasExtraEvent && d.extraInvestmentsActive.map((e) => (
+                          <span
+                            key={e.id}
+                            style={{
+                              display: 'inline-block',
+                              background: 'rgba(96, 165, 250, 0.15)',
+                              color: 'var(--blue)',
+                              border: '1px solid var(--blue)',
+                              borderRadius: '4px',
+                              padding: '0.1rem 0.35rem',
+                              fontWeight: '600',
+                              fontSize: '0.68rem',
+                            }}
+                          >
+                            🚀 {e.name} (+{formatCurrency(e.amount)}{e.applyUpcomingYears ? ' / yr 🔁' : ' 🎯'})
                           </span>
                         ))}
                       </div>

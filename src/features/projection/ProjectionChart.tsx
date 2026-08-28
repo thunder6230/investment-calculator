@@ -14,9 +14,9 @@ import { formatCurrency } from './projectionEngine';
 import type { YearDataPoint } from './projectionEngine';
 
 function CustomTooltip({ active, payload, label }: Partial<TooltipContentProps<number, string>>) {
+  const { showAfterTax } = useInvestmentPlanner();
   if (!active || !payload?.length) return null;
   const rawData = payload[0].payload as YearDataPoint;
-  const { showAfterTax } = useInvestmentPlanner();
   
   const grossVal = rawData.midpoint;
   const netVal = rawData.midpointAfterTax;

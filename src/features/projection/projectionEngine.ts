@@ -7,6 +7,14 @@ export interface Milestone {
   reinvest: boolean;
 }
 
+export interface ExtraInvestmentEvent {
+  id: string;
+  name: string;
+  amount: number;
+  year: number; // target year in projection timeline
+  applyUpcomingYears: boolean; // apply every year starting from `year` onwards
+}
+
 export interface YearDataPoint {
   year: number;
   paidIn: number;
@@ -23,6 +31,8 @@ export interface YearDataPoint {
   yearlyContribActive: number;
   fixedCostsActive: number;
   milestonesTriggered: Milestone[];
+  extraInvestmentsTotal: number;
+  extraInvestmentsActive: ExtraInvestmentEvent[];
 }
 
 export interface ProjectionResult {
@@ -50,6 +60,7 @@ export interface ProjectionParams {
   maxRate: number; // e.g. 0.08
   stepUpRate: number; // e.g. 0.02
   milestones: Milestone[];
+  extraInvestments?: ExtraInvestmentEvent[];
   baseFixedCosts: number;
   marginalTaxRate?: number; // employee personal marginal tax rate
 }
@@ -58,6 +69,7 @@ export interface ProjectionParams {
  * Calculate year-by-year investment projections.
  * Contributions are modelled as monthly with two additional annual top-ups.
  * Accounts for annual step-up contribution growth, dynamic expense milestones,
+ * extra lump-sum / recurring investment events,
  * and personal-income-bracket-adjusted capital gains taxation (Austrian KeSt).
  */
 export function calculateProjection(params: ProjectionParams): ProjectionResult {
@@ -71,6 +83,7 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
     maxRate,
     stepUpRate,
     milestones,
+    extraInvestments = [],
     baseFixedCosts,
     marginalTaxRate,
   } = params;
@@ -107,6 +120,8 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
       yearlyContribActive: monthlyContribution * 12 + juneExtra + decemberExtra,
       fixedCostsActive: baseFixedCosts,
       milestonesTriggered: [],
+      extraInvestmentsTotal: 0,
+      extraInvestmentsActive: [],
     },
   ];
 
@@ -120,18 +135,24 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
     // Milestones that trigger EXACTLY in this year (first year of activity, i.e., y === startYear + 1)
     const milestonesTriggered = milestones.filter((m) => y === m.startYear + 1);
 
-    // 3. Sum up reinvested savings from active decrease milestones
+    // 3. Identify active extra investment events for year y
+    const extraInvestmentsActive = extraInvestments.filter((e) =>
+      e.applyUpcomingYears ? y >= e.year : y === e.year
+    );
+    const extraInvestmentsTotal = extraInvestmentsActive.reduce((sum, e) => sum + e.amount, 0);
+
+    // 4. Sum up reinvested savings from active decrease milestones
     const reinvestedSavings = activeMilestones
       .filter((m) => m.type === 'decrease' && m.reinvest)
       .reduce((sum, m) => sum + m.amount, 0);
 
-    // 4. Calculate active contribution amounts
+    // 5. Calculate active contribution amounts
     const monthlyContribActive = Math.round(monthlyContribution * stepUpFactor + reinvestedSavings);
     const juneExtraActive = Math.round(juneExtra * stepUpFactor);
     const decemberExtraActive = Math.round(decemberExtra * stepUpFactor);
-    const yearlyContribActive = monthlyContribActive * 12 + juneExtraActive + decemberExtraActive;
+    const yearlyContribActive = monthlyContribActive * 12 + juneExtraActive + decemberExtraActive + extraInvestmentsTotal;
 
-    // 5. Calculate active fixed costs
+    // 6. Calculate active fixed costs
     const expenseReduction = activeMilestones
       .filter((m) => m.type === 'decrease')
       .reduce((sum, m) => sum + m.amount, 0);
@@ -167,6 +188,14 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
       }
     }
 
+    // Add extra investment event contributions for year y
+    if (extraInvestmentsTotal > 0) {
+      balLow += extraInvestmentsTotal;
+      balMid += extraInvestmentsTotal;
+      balHigh += extraInvestmentsTotal;
+      totalContributed += extraInvestmentsTotal;
+    }
+
     // Calculate after-tax estimates for year-end data points
     const lowGains = Math.max(0, balLow - totalContributed);
     const lowAfterTax = Math.round(balLow - lowGains * capGainsTaxRate);
@@ -192,6 +221,8 @@ export function calculateProjection(params: ProjectionParams): ProjectionResult 
       yearlyContribActive,
       fixedCostsActive,
       milestonesTriggered,
+      extraInvestmentsTotal,
+      extraInvestmentsActive,
     });
   }
 

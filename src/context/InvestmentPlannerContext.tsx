@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
-import type { TaxResult } from '../features/tax/taxCalculator';
-import { calculateAustrianNetIncome } from '../features/tax/taxCalculator';
-import type { Milestone, YearDataPoint, ProjectionResult } from '../features/projection/projectionEngine';
+import type { TaxResult, Country } from '../features/tax/taxCalculator';
+import { calculateNetIncome } from '../features/tax/taxCalculator';
+import type { Milestone, ExtraInvestmentEvent, YearDataPoint, ProjectionResult } from '../features/projection/projectionEngine';
 import { calculateProjection, yearlyContribution } from '../features/projection/projectionEngine';
 
 export interface ExpenseItem {
@@ -29,12 +29,25 @@ export interface Draft {
   milestones?: Milestone[];
   expenseMode?: 'simple' | 'detailed';
   expenseItems?: ExpenseItem[];
+  salaryPeriod?: 'monthly' | 'yearly';
+  country?: Country;
+  zuschlagMonthly?: number;
+  zuschlagSvsSubject?: boolean;
+  extraInvestments?: ExtraInvestmentEvent[];
 }
 
 export interface PlannerContextType {
   // --- State Variables ---
+  country: Country;
+  setCountry: (c: Country) => void;
+  salaryPeriod: 'monthly' | 'yearly';
+  setSalaryPeriod: (p: 'monthly' | 'yearly') => void;
   grossMonthly: number;
   setGrossMonthly: (v: number) => void;
+  zuschlagMonthly: number;
+  setZuschlagMonthly: (v: number) => void;
+  zuschlagSvsSubject: boolean;
+  setZuschlagSvsSubject: (v: boolean) => void;
   fixedCosts: number;
   setFixedCosts: (v: number) => void;
   startCapital: number;
@@ -59,6 +72,8 @@ export interface PlannerContextType {
   setStepUpRate: (v: number) => void;
   milestones: Milestone[];
   setMilestones: React.Dispatch<React.SetStateAction<Milestone[]>>;
+  extraInvestments: ExtraInvestmentEvent[];
+  setExtraInvestments: React.Dispatch<React.SetStateAction<ExtraInvestmentEvent[]>>;
   expenseMode: 'simple' | 'detailed';
   setExpenseMode: (mode: 'simple' | 'detailed') => void;
   expenseItems: ExpenseItem[];
@@ -99,6 +114,16 @@ export interface PlannerContextType {
   newMilestoneReinvest: boolean;
   setNewMilestoneReinvest: (v: boolean) => void;
 
+  // --- Extra Investment Event Builder states ---
+  newEventName: string;
+  setNewEventName: (v: string) => void;
+  newEventAmount: number;
+  setNewEventAmount: (v: number) => void;
+  newEventYear: number;
+  setNewEventYear: (v: number) => void;
+  newEventApplyUpcoming: boolean;
+  setNewEventApplyUpcoming: (v: boolean) => void;
+
   // --- Derived Memoized Projections ---
   taxResult: TaxResult;
   totalDetailedNeeds: number;
@@ -137,7 +162,11 @@ const lastSession = (() => {
 
 export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // ── Baseline inputs ──────────────────────────────────────────────────────
+  const [country, setCountry] = useState<Country>(() => lastSession.country ?? 'AT');
+  const [salaryPeriod, setSalaryPeriod] = useState<'monthly' | 'yearly'>(() => lastSession.salaryPeriod ?? 'monthly');
   const [grossMonthly, setGrossMonthly] = useState<number>(() => lastSession.grossMonthly ?? 3_500);
+  const [zuschlagMonthly, setZuschlagMonthly] = useState<number>(() => lastSession.zuschlagMonthly ?? 0);
+  const [zuschlagSvsSubject, setZuschlagSvsSubject] = useState<boolean>(() => lastSession.zuschlagSvsSubject ?? true);
   const [fixedCosts, setFixedCosts] = useState<number>(() => lastSession.fixedCosts ?? 1_500);
   const [startCapital, setStartCapital] = useState<number>(() => lastSession.startCapital ?? 10_000);
   const [monthlyInvest, setMonthlyInvest] = useState<number>(() => lastSession.monthlyInvest ?? 300);
@@ -172,6 +201,25 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
   const [newMilestoneStartYear, setNewMilestoneStartYear] = useState<number>(5);
   const [newMilestoneReinvest, setNewMilestoneReinvest] = useState<boolean>(true);
 
+  // ── Extra Investment Events ──────────────────────────────────────────────
+  const [extraInvestments, setExtraInvestments] = useState<ExtraInvestmentEvent[]>(() => {
+    if (lastSession.extraInvestments) return lastSession.extraInvestments;
+    return [
+      {
+        id: 'default-promo-bonus',
+        name: 'Promotion Bonus',
+        amount: 2500,
+        year: 2,
+        applyUpcomingYears: false,
+      }
+    ];
+  });
+
+  const [newEventName, setNewEventName] = useState('');
+  const [newEventAmount, setNewEventAmount] = useState<number>(1000);
+  const [newEventYear, setNewEventYear] = useState<number>(3);
+  const [newEventApplyUpcoming, setNewEventApplyUpcoming] = useState<boolean>(false);
+
   // ── Expense tracker ──────────────────────────────────────────────────────
   const [expenseMode, setExpenseMode] = useState<'simple' | 'detailed'>(() => lastSession.expenseMode ?? 'simple');
   const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>(() => {
@@ -198,7 +246,7 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
   // AI Copilot credentials & outputs (loaded securely from standard localStorage)
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('finanzat-api-key') ?? '');
   const [apiProvider, setApiProvider] = useState<'gemini' | 'openai' | 'openrouter'>(() => {
-    return (localStorage.getItem('finanzat-api-provider') as any) ?? 'gemini';
+    return (localStorage.getItem('finanzat-api-provider') as 'gemini' | 'openai' | 'openrouter') ?? 'gemini';
   });
   const [aiOutput, setAiOutput] = useState<string>(() => localStorage.getItem('finanzat-ai-output') ?? '');
 
@@ -219,7 +267,11 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
   // ── Auto-save to localStorage ───────────────────────────────────────────
   useEffect(() => {
     const data = {
+      country,
+      salaryPeriod,
       grossMonthly,
+      zuschlagMonthly,
+      zuschlagSvsSubject,
       fixedCosts,
       startCapital,
       monthlyInvest,
@@ -232,13 +284,18 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
       loanRepayment,
       stepUpRate,
       milestones,
+      extraInvestments,
       expenseMode,
       expenseItems,
       showAfterTax,
     };
     localStorage.setItem('investment-calculator-last-session', JSON.stringify(data));
   }, [
+    country,
+    salaryPeriod,
     grossMonthly,
+    zuschlagMonthly,
+    zuschlagSvsSubject,
     fixedCosts,
     startCapital,
     monthlyInvest,
@@ -251,6 +308,7 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
     loanRepayment,
     stepUpRate,
     milestones,
+    extraInvestments,
     expenseMode,
     expenseItems,
     showAfterTax,
@@ -269,17 +327,12 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
     localStorage.setItem('finanzat-ai-output', aiOutput);
   }, [aiOutput]);
 
-  // Adjust forecast timeline limits if projection years shrinks
-  useEffect(() => {
-    if (budgetYear > years) {
-      setBudgetYear(years);
-    }
-  }, [years, budgetYear]);
+  const effectiveBudgetYear = Math.min(budgetYear, years);
 
   // ── Memoized derived logic & mathematical computations ───────────────────
   const taxResult = useMemo(
-    () => calculateAustrianNetIncome(grossMonthly * 14),
-    [grossMonthly]
+    () => calculateNetIncome(grossMonthly, country, zuschlagMonthly, zuschlagSvsSubject),
+    [grossMonthly, country, zuschlagMonthly, zuschlagSvsSubject]
   );
 
   const totalDetailedNeeds = useMemo(() => {
@@ -306,10 +359,11 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         maxRate: maxRate / 100,
         stepUpRate: stepUpRate / 100,
         milestones,
+        extraInvestments,
         baseFixedCosts: activeBaseFixedCosts,
         marginalTaxRate: taxResult.marginalTaxRate,
       }),
-    [startCapital, monthlyInvest, juneExtra, decemberExtra, years, minRate, maxRate, stepUpRate, milestones, activeBaseFixedCosts, taxResult.marginalTaxRate]
+    [startCapital, monthlyInvest, juneExtra, decemberExtra, years, minRate, maxRate, stepUpRate, milestones, extraInvestments, activeBaseFixedCosts, taxResult.marginalTaxRate]
   );
 
   const idealProjection = useMemo(
@@ -324,6 +378,7 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         maxRate: maxRate / 100,
         stepUpRate: 0,
         milestones: [],
+        extraInvestments: [],
         baseFixedCosts: activeBaseFixedCosts,
         marginalTaxRate: taxResult.marginalTaxRate,
       }),
@@ -331,8 +386,8 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
   );
 
   const activePointForBudget = useMemo(() => {
-    return projection.dataPoints.find((dp) => dp.year === budgetYear) || projection.dataPoints[0];
-  }, [projection.dataPoints, budgetYear]);
+    return projection.dataPoints.find((dp) => dp.year === effectiveBudgetYear) || projection.dataPoints[0];
+  }, [projection.dataPoints, effectiveBudgetYear]);
 
   const activeFixedCosts = activePointForBudget.fixedCostsActive;
   const activeMonthlyInvest = activePointForBudget.monthlyContribActive;
@@ -367,8 +422,13 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
       loanRepayment,
       stepUpRate,
       milestones,
+      extraInvestments,
       expenseMode,
       expenseItems,
+      salaryPeriod,
+      country,
+      zuschlagMonthly,
+      zuschlagSvsSubject,
     };
     const updated = [newDraft, ...savedDrafts.filter((d) => d.name !== newDraft.name)];
     setSavedDrafts(updated);
@@ -379,7 +439,11 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
   const handleLoadDraft = (name: string) => {
     const found = savedDrafts.find((d) => d.name === name);
     if (found) {
+      setCountry(found.country ?? 'AT');
+      if (found.salaryPeriod) setSalaryPeriod(found.salaryPeriod);
       setGrossMonthly(found.grossMonthly);
+      setZuschlagMonthly(found.zuschlagMonthly ?? 0);
+      setZuschlagSvsSubject(found.zuschlagSvsSubject ?? true);
       setFixedCosts(found.fixedCosts);
       setStartCapital(found.startCapital);
       setMonthlyInvest(found.monthlyInvest);
@@ -392,6 +456,7 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
       setLoanRepayment(found.loanRepayment ?? 0);
       setStepUpRate(found.stepUpRate ?? 0);
       setMilestones(found.milestones ?? []);
+      setExtraInvestments(found.extraInvestments ?? []);
       setExpenseMode(found.expenseMode ?? 'simple');
       setExpenseItems(found.expenseItems ?? []);
     }
@@ -406,7 +471,11 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
   return (
     <PlannerContext.Provider
       value={{
+        country, setCountry,
+        salaryPeriod, setSalaryPeriod,
         grossMonthly, setGrossMonthly,
+        zuschlagMonthly, setZuschlagMonthly,
+        zuschlagSvsSubject, setZuschlagSvsSubject,
         fixedCosts, setFixedCosts,
         startCapital, setStartCapital,
         monthlyInvest, setMonthlyInvest,
@@ -419,6 +488,7 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         loanRepayment, setLoanRepayment,
         stepUpRate, setStepUpRate,
         milestones, setMilestones,
+        extraInvestments, setExtraInvestments,
         expenseMode, setExpenseMode,
         expenseItems, setExpenseItems,
         budgetYear, setBudgetYear,
@@ -439,6 +509,11 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         newMilestoneType, setNewMilestoneType,
         newMilestoneStartYear, setNewMilestoneStartYear,
         newMilestoneReinvest, setNewMilestoneReinvest,
+
+        newEventName, setNewEventName,
+        newEventAmount, setNewEventAmount,
+        newEventYear, setNewEventYear,
+        newEventApplyUpcoming, setNewEventApplyUpcoming,
 
         taxResult,
         totalDetailedNeeds,
@@ -467,6 +542,7 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useInvestmentPlanner = () => {
   const context = useContext(PlannerContext);
   if (context === undefined) {

@@ -3,6 +3,7 @@ import ScenarioManager from './features/scenarios/ScenarioManager';
 import TaxSection from './features/tax/TaxSection';
 import InvestmentInputs from './features/projection/InvestmentInputs';
 import MilestoneBuilder from './features/projection/MilestoneBuilder';
+import ExtraInvestmentsBuilder from './features/projection/ExtraInvestmentsBuilder';
 import BudgetRecommendations from './features/budget/BudgetRecommendations';
 import ProjectionChart from './features/projection/ProjectionChart';
 import ProjectionTable from './features/projection/ProjectionTable';
@@ -12,21 +13,27 @@ import AICopilotConsole from './features/copilot/AICopilotConsole';
 import './App.css';
 
 function MainLayout() {
-  const { activeTab, setActiveTab } = useInvestmentPlanner();
+  const { activeTab, setActiveTab, country } = useInvestmentPlanner();
 
   return (
     <div className="app">
       <header className="app-header">
-        <h1>🇦🇹 Austrian Investment Calculator</h1>
-        <p className="subtitle">Project your wealth growth with Austrian tax considerations</p>
+        <h1>{country === 'AT' ? '🇦🇹 Austrian Investment Calculator' : '🇭🇺 Hungarian Investment Calculator'}</h1>
+        <p className="subtitle">
+          {country === 'AT'
+            ? 'Project your wealth growth with Austrian tax considerations (Einkommensteuer & KeSt)'
+            : 'Project your wealth growth with Hungarian tax rules (15% PIT & 18.5% TB)'}
+        </p>
       </header>
 
       <div className="layout-container">
         {/* Navigation Top Bar / Tabs */}
         <nav className="navbar">
           <div className="navbar-logo">
-            <span style={{ fontSize: '1.4rem' }}>🏔️</span>
-            <span style={{ fontWeight: '800', fontSize: '0.92rem', color: 'var(--text)', letterSpacing: '0.5px' }}>FinanzAT Pro</span>
+            <span style={{ fontSize: '1.4rem' }}>{country === 'AT' ? '🏔️' : '🏰'}</span>
+            <span style={{ fontWeight: '800', fontSize: '0.92rem', color: 'var(--text)', letterSpacing: '0.5px' }}>
+              {country === 'AT' ? 'FinanzAT Pro' : 'FinanzHU Pro'}
+            </span>
           </div>
           
           <div className="navbar-menu">
@@ -55,7 +62,7 @@ function MainLayout() {
           
           <div className="navbar-info">
             <div style={{ fontSize: '0.72rem', color: 'var(--muted)', background: 'var(--surface2)', padding: '0.35rem 0.60rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
-              ℹ️ Austrian Tax Rules 2024–2026
+              {country === 'AT' ? 'ℹ️ Austrian Tax Rules 2024–2026' : 'ℹ️ Hungarian Tax Rules (15% PIT + 18.5% TB)'}
             </div>
           </div>
         </nav>
@@ -68,6 +75,7 @@ function MainLayout() {
                 <ScenarioManager />
                 <TaxSection />
                 <InvestmentInputs />
+                <ExtraInvestmentsBuilder />
                 <MilestoneBuilder />
               </aside>
 

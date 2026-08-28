@@ -1,58 +1,53 @@
 import { useState } from 'react';
 import { useInvestmentPlanner } from '../../context/InvestmentPlannerContext';
 import { formatCurrency } from './projectionEngine';
-import type { Milestone } from './projectionEngine';
+import type { ExtraInvestmentEvent } from './projectionEngine';
 
-function generateMilestoneId(prefix: string): string {
+function generateEventId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
-export default function MilestoneBuilder() {
+export default function ExtraInvestmentsBuilder() {
   const {
-    milestones,
-    setMilestones,
+    extraInvestments,
+    setExtraInvestments,
     years,
-    newMilestoneName,
-    setNewMilestoneName,
-    newMilestoneAmount,
-    setNewMilestoneAmount,
-    newMilestoneType,
-    setNewMilestoneType,
-    newMilestoneStartYear,
-    setNewMilestoneStartYear,
-    newMilestoneReinvest,
-    setNewMilestoneReinvest,
+    newEventName,
+    setNewEventName,
+    newEventAmount,
+    setNewEventAmount,
+    newEventYear,
+    setNewEventYear,
+    newEventApplyUpcoming,
+    setNewEventApplyUpcoming,
   } = useInvestmentPlanner();
 
   // Inline editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState<string>('');
   const [editAmount, setEditAmount] = useState<number>(0);
-  const [editType, setEditType] = useState<'decrease' | 'increase'>('decrease');
-  const [editStartYear, setEditStartYear] = useState<number>(1);
-  const [editReinvest, setEditReinvest] = useState<boolean>(true);
+  const [editYear, setEditYear] = useState<number>(1);
+  const [editApplyUpcoming, setEditApplyUpcoming] = useState<boolean>(false);
 
-  const handleStartEdit = (m: Milestone) => {
-    setEditingId(m.id);
-    setEditName(m.name);
-    setEditAmount(m.amount);
-    setEditType(m.type);
-    setEditStartYear(m.startYear);
-    setEditReinvest(m.reinvest);
+  const handleStartEdit = (evt: ExtraInvestmentEvent) => {
+    setEditingId(evt.id);
+    setEditName(evt.name);
+    setEditAmount(evt.amount);
+    setEditYear(evt.year);
+    setEditApplyUpcoming(evt.applyUpcomingYears);
   };
 
   const handleSaveEdit = (id: string) => {
     if (!editName.trim()) return;
-    setMilestones((prev) =>
+    setExtraInvestments((prev) =>
       prev.map((item) =>
         item.id === id
           ? {
               ...item,
               name: editName.trim(),
               amount: editAmount,
-              type: editType,
-              startYear: editStartYear,
-              reinvest: editType === 'decrease' ? editReinvest : false,
+              year: editYear,
+              applyUpcomingYears: editApplyUpcoming,
             }
           : item
       )
@@ -64,46 +59,46 @@ export default function MilestoneBuilder() {
     setEditingId(null);
   };
 
-  const handleCloneMilestone = (m: Milestone) => {
-    const cloned: Milestone = {
-      ...m,
-      id: generateMilestoneId('milestone'),
-      name: `${m.name} (Copy)`,
+  const handleCloneEvent = (evt: ExtraInvestmentEvent) => {
+    const cloned: ExtraInvestmentEvent = {
+      ...evt,
+      id: generateEventId('event'),
+      name: `${evt.name} (Copy)`,
     };
-    setMilestones((prev) => [...prev, cloned]);
+    setExtraInvestments((prev) => [...prev, cloned]);
   };
 
   return (
     <section className="card">
-      <h2 className="section-title">⏳ Future Expense Milestones</h2>
+      <h2 className="section-title">🚀 Extra Investment Events</h2>
       <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '1rem', lineHeight: '1.4' }}>
-        Model future changes in expenses (e.g. paying off a car loan, finishing a mortgage, school costs). 
-        <strong> Auto-reinvesting</strong> savings dynamically boosts your monthly investments from that year onwards!
+        Model extra lump-sum investments (e.g., promotion bonus, inheritance, asset sales). 
+        Check <strong>"Apply for all upcoming years"</strong> to repeat the extra contribution every year from that year onward!
       </p>
 
-      {/* Milestones list */}
-      {milestones.length > 0 ? (
-        <div className="milestones-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.25rem' }}>
-          {milestones.map((m) => (
+      {/* Events list */}
+      {extraInvestments.length > 0 ? (
+        <div className="events-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.25rem' }}>
+          {extraInvestments.map((evt) => (
             <div
-              key={m.id}
-              className={`milestone-item ${m.type}`}
+              key={evt.id}
+              className="event-item"
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 background: 'var(--surface2)',
-                border: `1px solid ${m.type === 'decrease' ? 'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)'}`,
-                borderLeft: `4px solid ${m.type === 'decrease' ? 'var(--green)' : 'var(--red)'}`,
+                border: '1px solid rgba(96, 165, 250, 0.3)',
+                borderLeft: '4px solid var(--blue)',
                 padding: '0.5rem 0.75rem',
                 borderRadius: '6px',
               }}
             >
-              {editingId === m.id ? (
+              {editingId === evt.id ? (
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <input
                     type="text"
-                    placeholder="Milestone Label"
+                    placeholder="Event Label"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     style={{
@@ -119,11 +114,11 @@ export default function MilestoneBuilder() {
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <input
                       type="number"
-                      placeholder="Amount (€/mo)"
+                      placeholder="Amount (€)"
                       value={editAmount}
                       onChange={(e) => setEditAmount(Math.max(0, Number(e.target.value)))}
                       style={{
-                        width: '33%',
+                        width: '50%',
                         padding: '0.35rem 0.5rem',
                         fontSize: '0.8rem',
                         borderRadius: '4px',
@@ -135,13 +130,13 @@ export default function MilestoneBuilder() {
                     />
                     <input
                       type="number"
-                      placeholder="After Year"
+                      placeholder="Target Year"
                       min={1}
                       max={years}
-                      value={editStartYear}
-                      onChange={(e) => setEditStartYear(Math.min(years, Math.max(1, Number(e.target.value))))}
+                      value={editYear}
+                      onChange={(e) => setEditYear(Math.min(years, Math.max(1, Number(e.target.value))))}
                       style={{
-                        width: '33%',
+                        width: '50%',
                         padding: '0.35rem 0.5rem',
                         fontSize: '0.8rem',
                         borderRadius: '4px',
@@ -151,48 +146,25 @@ export default function MilestoneBuilder() {
                         outline: 'none',
                       }}
                     />
-                    <select
-                      value={editType}
-                      onChange={(e) => {
-                        const type = e.target.value as 'decrease' | 'increase';
-                        setEditType(type);
-                        if (type === 'increase') setEditReinvest(false);
-                      }}
-                      style={{
-                        width: '34%',
-                        padding: '0.35rem 0.5rem',
-                        fontSize: '0.78rem',
-                        borderRadius: '4px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--surface1)',
-                        color: 'var(--text)',
-                        outline: 'none',
-                      }}
-                    >
-                      <option value="decrease">📉 Decrease</option>
-                      <option value="increase">📈 Increase</option>
-                    </select>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {editType === 'decrease' ? (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--text)', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={editReinvest}
-                          onChange={(e) => setEditReinvest(e.target.checked)}
-                        />
-                        Auto-reinvest savings
-                      </label>
-                    ) : <div />}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--text)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={editApplyUpcoming}
+                        onChange={(e) => setEditApplyUpcoming(e.target.checked)}
+                      />
+                      Apply for all upcoming years
+                    </label>
                     <div style={{ display: 'flex', gap: '0.25rem' }}>
                       <button
-                        onClick={() => handleSaveEdit(m.id)}
+                        onClick={() => handleSaveEdit(evt.id)}
                         style={{
                           padding: '0.25rem 0.55rem',
                           fontSize: '0.72rem',
                           fontWeight: '600',
-                          background: 'var(--green)',
-                          color: '#0f172a',
+                          background: 'var(--blue)',
+                          color: '#ffffff',
                           border: 'none',
                           borderRadius: '4px',
                           cursor: 'pointer',
@@ -221,20 +193,15 @@ export default function MilestoneBuilder() {
                 <>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                     <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text)' }}>
-                      {m.name}
+                      {evt.name}
                     </span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
-                      {m.type === 'decrease' ? 'Saves' : 'Costs'} {formatCurrency(m.amount)}/mo • triggers after Year {m.startYear}
+                      Adds +{formatCurrency(evt.amount)} {evt.applyUpcomingYears ? `every year from Year ${evt.year} onwards 🔁` : `in Year ${evt.year} 🎯`}
                     </span>
-                    {m.type === 'decrease' && m.reinvest && (
-                      <span style={{ fontSize: '0.68rem', color: 'var(--emerald)', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                        ⚡ Auto-reinvested into growth portfolio!
-                      </span>
-                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <button
-                      onClick={() => handleStartEdit(m)}
+                      onClick={() => handleStartEdit(evt)}
                       style={{
                         background: 'var(--surface1)',
                         border: '1px solid var(--border)',
@@ -249,16 +216,16 @@ export default function MilestoneBuilder() {
                         gap: '0.2rem',
                         transition: 'all 0.15s ease',
                       }}
-                      title="Edit this milestone"
+                      title="Edit this event"
                     >
                       ✏️ Edit
                     </button>
                     <button
-                      onClick={() => handleCloneMilestone(m)}
+                      onClick={() => handleCloneEvent(evt)}
                       style={{
-                        background: 'rgba(74, 222, 128, 0.12)',
-                        border: '1px solid rgba(74, 222, 128, 0.4)',
-                        color: 'var(--green)',
+                        background: 'rgba(96, 165, 250, 0.12)',
+                        border: '1px solid rgba(96, 165, 250, 0.4)',
+                        color: 'var(--blue)',
                         borderRadius: '4px',
                         fontSize: '0.72rem',
                         fontWeight: '600',
@@ -269,12 +236,12 @@ export default function MilestoneBuilder() {
                         gap: '0.25rem',
                         transition: 'all 0.15s ease',
                       }}
-                      title="Clone this milestone"
+                      title="Clone this event"
                     >
                       📋 Duplicate
                     </button>
                     <button
-                      onClick={() => setMilestones(milestones.filter((item) => item.id !== m.id))}
+                      onClick={() => setExtraInvestments(extraInvestments.filter((item) => item.id !== evt.id))}
                       style={{
                         background: 'transparent',
                         border: 'none',
@@ -284,7 +251,7 @@ export default function MilestoneBuilder() {
                         fontWeight: '700',
                         padding: '0.25rem',
                       }}
-                      title="Remove milestone"
+                      title="Remove event"
                     >
                       ×
                     </button>
@@ -296,22 +263,22 @@ export default function MilestoneBuilder() {
         </div>
       ) : (
         <div style={{ textAlign: 'center', padding: '1rem', background: 'var(--surface2)', borderRadius: '6px', border: '1px dashed var(--border)', fontSize: '0.78rem', color: 'var(--muted)', marginBottom: '1.25rem' }}>
-          No future expense milestones configured yet.
+          No extra investment events configured yet.
         </div>
       )}
 
-      {/* Form to add a milestone */}
+      {/* Form to add an extra investment event */}
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-        <h3 style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text)', marginBottom: '0.75rem' }}>➕ Add Expense Milestone</h3>
+        <h3 style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text)', marginBottom: '0.75rem' }}>➕ Add Extra Investment Event</h3>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Milestone Label</label>
+            <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Event Label</label>
             <input
               type="text"
-              placeholder="e.g. Car loan finished, Rent increase"
-              value={newMilestoneName}
-              onChange={(e) => setNewMilestoneName(e.target.value)}
+              placeholder="e.g. Promotion Bonus, Stock Option Vesting"
+              value={newEventName}
+              onChange={(e) => setNewEventName(e.target.value)}
               style={{
                 width: '100%',
                 padding: '0.45rem 0.6rem',
@@ -327,13 +294,13 @@ export default function MilestoneBuilder() {
 
           <div className="form-grid-half">
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Amount (€/month)</label>
+              <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Extra Amount (€)</label>
               <input
                 type="number"
-                min={10}
-                step={50}
-                value={newMilestoneAmount}
-                onChange={(e) => setNewMilestoneAmount(Math.max(0, Number(e.target.value)))}
+                min={50}
+                step={500}
+                value={newEventAmount}
+                onChange={(e) => setNewEventAmount(Math.max(0, Number(e.target.value)))}
                 style={{
                   width: '100%',
                   padding: '0.45rem 0.6rem',
@@ -347,13 +314,13 @@ export default function MilestoneBuilder() {
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Timing (After Year)</label>
+              <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Target Year</label>
               <input
                 type="number"
                 min={1}
                 max={years}
-                value={newMilestoneStartYear}
-                onChange={(e) => setNewMilestoneStartYear(Math.min(years, Math.max(1, Number(e.target.value))))}
+                value={newEventYear}
+                onChange={(e) => setNewEventYear(Math.min(years, Math.max(1, Number(e.target.value))))}
                 style={{
                   width: '100%',
                   padding: '0.45rem 0.6rem',
@@ -368,77 +335,47 @@ export default function MilestoneBuilder() {
             </div>
           </div>
 
-          <div className="form-grid-split">
-            <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>Type of change</label>
-              <select
-                value={newMilestoneType}
-                onChange={(e) => {
-                  const type = e.target.value as 'decrease' | 'increase';
-                  setNewMilestoneType(type);
-                  if (type === 'increase') setNewMilestoneReinvest(false);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '0.45rem',
-                  fontSize: '0.8rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface2)',
-                  color: 'var(--text)',
-                  outline: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="decrease">📉 Decrease Expenses</option>
-                <option value="increase">📈 Increase Expenses</option>
-              </select>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.25rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={newEventApplyUpcoming}
+                onChange={(e) => setNewEventApplyUpcoming(e.target.checked)}
+                style={{ width: '15px', height: '15px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.74rem', color: 'var(--text)' }}>
+                Apply for all upcoming years (recurring)
+              </span>
+            </label>
 
             <button
               onClick={() => {
-                if (!newMilestoneName.trim()) return;
-                const newItem: Milestone = {
-                  id: generateMilestoneId('milestone'),
-                  name: newMilestoneName.trim(),
-                  amount: newMilestoneAmount,
-                  type: newMilestoneType,
-                  startYear: newMilestoneStartYear,
-                  reinvest: newMilestoneType === 'decrease' ? newMilestoneReinvest : false,
+                if (!newEventName.trim()) return;
+                const newItem: ExtraInvestmentEvent = {
+                  id: generateEventId('event'),
+                  name: newEventName.trim(),
+                  amount: newEventAmount,
+                  year: newEventYear,
+                  applyUpcomingYears: newEventApplyUpcoming,
                 };
-                setMilestones([...milestones, newItem]);
-                setNewMilestoneName('');
+                setExtraInvestments([...extraInvestments, newItem]);
+                setNewEventName('');
               }}
               style={{
-                padding: '0.5rem 0.75rem',
+                padding: '0.5rem 0.85rem',
                 fontSize: '0.8rem',
                 fontWeight: '600',
                 borderRadius: '6px',
                 border: 'none',
-                background: 'var(--green)',
-                color: '#0f172a',
+                background: 'var(--blue)',
+                color: '#ffffff',
                 cursor: 'pointer',
-                height: '35px',
-                alignSelf: 'end',
+                transition: 'all 0.15s ease',
               }}
             >
-              Add Trigger
+              Add Event
             </button>
           </div>
-
-          {newMilestoneType === 'decrease' && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '0.25rem' }}>
-              <input
-                type="checkbox"
-                checked={newMilestoneReinvest}
-                onChange={(e) => setNewMilestoneReinvest(e.target.checked)}
-                style={{ width: '15px', height: '15px', cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: '0.74rem', color: 'var(--text)' }}>
-                Auto-reinvest savings into monthly contributions
-              </span>
-            </label>
-          )}
         </div>
       </div>
     </section>

@@ -25,6 +25,7 @@ export default function AICopilotConsole() {
     totalDetailedWants,
     wantsPercent,
     activeTotalMonthlySavings,
+    extraInvestments,
     apiKey,
     setApiKey,
     apiProvider,
@@ -60,6 +61,7 @@ export default function AICopilotConsole() {
     totalDetailedWants,
     wantsPercent,
     activeTotalMonthlySavings,
+    extraInvestments,
   });
 
   const handleRunRealAudit = async () => {
@@ -69,8 +71,9 @@ export default function AICopilotConsole() {
       const payload = getAuditPayload();
       const output = await executeAudit(apiProvider, apiKey, payload);
       setAiOutput(output);
-    } catch (e: any) {
-      setError(e.message || 'An error occurred during API execution.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'An error occurred during API execution.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -85,7 +88,7 @@ export default function AICopilotConsole() {
         const payload = getAuditPayload();
         const output = getMockAudit(payload);
         setAiOutput(output);
-      } catch (e: any) {
+      } catch {
         setError('Failed to run mock simulated audit.');
       } finally {
         setLoading(false);
@@ -98,7 +101,7 @@ export default function AICopilotConsole() {
     if (!text) return null;
 
     const lines = text.split('\n');
-    let elements: React.ReactNode[] = [];
+    const elements: React.ReactNode[] = [];
     let keyCounter = 0;
     
     // Auxiliary state trackers for custom alerts & lists
@@ -262,7 +265,7 @@ export default function AICopilotConsole() {
               </label>
               <select
                 value={apiProvider}
-                onChange={(e) => setApiProvider(e.target.value as any)}
+                onChange={(e) => setApiProvider(e.target.value as 'gemini' | 'openai' | 'openrouter')}
                 style={{
                   width: '100%',
                   padding: '0.45rem',

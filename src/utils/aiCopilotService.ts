@@ -1,5 +1,6 @@
 import type { TaxResult } from '../features/tax/taxCalculator';
-import type { ProjectionResult, YearDataPoint } from '../features/projection/projectionEngine';
+import type { ProjectionResult, YearDataPoint, ExtraInvestmentEvent } from '../features/projection/projectionEngine';
+import type { ExpenseItem } from '../context/InvestmentPlannerContext';
 import { formatCurrency } from '../features/projection/projectionEngine';
 
 export interface AuditData {
@@ -14,7 +15,7 @@ export interface AuditData {
   lifeInsurance: number;
   loanRepayment: number;
   expenseMode: 'simple' | 'detailed';
-  expenseItems: any[];
+  expenseItems: ExpenseItem[];
   taxResult: TaxResult;
   projection: ProjectionResult;
   lastPoint: YearDataPoint;
@@ -24,6 +25,7 @@ export interface AuditData {
   totalDetailedWants: number;
   wantsPercent: number;
   activeTotalMonthlySavings: number;
+  extraInvestments?: ExtraInvestmentEvent[];
 }
 
 /**
@@ -47,28 +49,33 @@ function buildPrompt(data: AuditData): string {
     projection,
     lastPoint,
     investableSurplus,
+    extraInvestments = [],
   } = data;
 
+  const countryName = taxResult.country === 'HU' ? 'Hungary 🇭🇺' : 'Austria 🇦🇹';
   const personalRate = taxResult.marginalTaxRate;
   const capGainsTaxRate = Math.min(0.275, personalRate);
   
-  // Format detailed expenses
+  // Format detailed expenses & extra investment events
   const detailedExpensesList = expenseItems.map(item => `- ${item.name}: €${item.amount}/mo (${item.category === 'need' ? 'Need' : 'Want'})`).join('\n');
+  const extraEventsList = extraInvestments.map(evt => `- ${evt.name}: +€${evt.amount} in Year ${evt.year} (${evt.applyUpcomingYears ? 'Recurring every year onwards' : 'Single year lump-sum'})`).join('\n');
 
-  return `You are FinanzAT Pro AI Copilot, a senior financial adviser specialized in Austrian wealth building, personal budgeting, and progressive taxation. 
+  return `You are FinanzAT/HU Pro AI Copilot, a senior financial adviser specialized in ${countryName} wealth building, personal budgeting, and taxation. 
 
 Please perform a comprehensive, actionable, and visually beautiful Financial Security Audit based on the user's detailed data below:
 
-### 💼 Income & Austrian Taxation (14x Payouts)
-- **Gross Monthly Salary**: €${grossMonthly} (Paid 14 times per year, equivalent to Gross Yearly of €${taxResult.grossYearly})
+### 💼 Income & ${countryName} Taxation
+- **Selected Country**: ${countryName}
+- **Base Gross Monthly Salary**: €${grossMonthly}
+- **Fixed Monthly Zuschlag / Bonus**: €${taxResult.zuschlagMonthly}${taxResult.country === 'AT' ? (taxResult.zuschlagSvsSubject ? ' (Subject to SVS)' : ' (Exempt from SVS)') : ''}
+- **Gross Yearly Income**: €${taxResult.grossYearly} (${taxResult.country === 'AT' ? '14 payouts' : '12 payouts'})
 - **Monthly Net Equivalent (avg. over 12 payouts)**: €${Math.round(taxResult.netMonthly)}/month
-- **True Monthly Net Regular Payout**: €${Math.round(taxResult.netRegularMonthly)}/month (Normalized base)
-- **Holiday Bonus (13th Net - Urlaubsgeld)**: €${Math.round(taxResult.net13th)} (Taxed at heavily discounted rate of 6% after deductions)
-- **Christmas Bonus (14th Net - Weihnachtsgeld)**: €${Math.round(taxResult.net14th)} (Taxed at discounted rate of 6% after deductions)
-- **Social Security Contribution Share**: €${Math.round(taxResult.socialSecurity)}/year (Employee rate ~18.12% up to ceiling limit)
-- **Austrian Income Tax Paid**: €${Math.round(taxResult.incomeTax)}/year
-- **Personal Marginal Tax Rate**: ${ (personalRate * 100).toFixed(0) }%
-- **Effective personal tax rate (including social security)**: ${ (taxResult.effectiveTaxRate * 100).toFixed(1) }%
+- **True Monthly Net Regular Payout**: €${Math.round(taxResult.netRegularMonthly)}/month
+${taxResult.country === 'AT' ? `- **Holiday Bonus (13th Net - Urlaubsgeld)**: €${Math.round(taxResult.net13th)}
+- **Christmas Bonus (14th Net - Weihnachtsgeld)**: €${Math.round(taxResult.net14th)}` : ''}
+- **Social Security Contribution Share**: €${Math.round(taxResult.socialSecurity)}/year
+- **Income Tax Paid**: €${Math.round(taxResult.incomeTax)}/year
+- **Effective personal tax & SS rate**: ${ (taxResult.effectiveTaxRate * 100).toFixed(1) }%
 
 ### 🛒 Expenses & Monthly Cash Flow
 - **Budgeting Entry Mode**: ${expenseMode === 'detailed' ? 'Detailed itemized tracker' : 'Simple fixed costs estimate'}
@@ -83,12 +90,13 @@ ${expenseMode === 'detailed' ? `- **Itemized Expenses logged**:\n${detailedExpen
 - **Annual step-up growth indexation (contribution increase rate)**: ${stepUpRate}% per year
 - **Shielded savings excluded from projection (Life Insurance)**: €${lifeInsurance}/month
 - **Shielded savings excluded from projection (Loan Fund)**: €${loanRepayment}/month
+${extraInvestments.length > 0 ? `- **Configured Extra Investment Events**:\n${extraEventsList}` : ''}
 
-### 📈 Projections & Capital Gains (KeSt)
+### 📈 Projections & Capital Gains
 - **Timeline Range**: ${years} years
 - **Expected Final Gross Value (Before Tax Midpoint)**: €${Math.round(lastPoint.midpoint)}
-- **Expected Final Net Value (After Capital Gains KeSt)**: €${Math.round(lastPoint.midpointAfterTax)}
-- **Estimated gains tax rate applied (Rule option applied if progressive rate < 27.5%)**: ${(capGainsTaxRate * 100).toFixed(1)}%
+- **Expected Final Net Value (After Capital Gains Tax)**: €${Math.round(lastPoint.midpointAfterTax)}
+- **Estimated gains tax rate applied**: ${(capGainsTaxRate * 100).toFixed(1)}%
 - **Net average monthly payout equivalent over remaining lifecycle**: €${projection.monthlyPayoutMidAfterTax}/month
 
 ---
@@ -96,8 +104,8 @@ ${expenseMode === 'detailed' ? `- **Itemized Expenses logged**:\n${detailedExpen
 ### Output Requirements:
 1. Provide a professional, encouraging and highly specific audit formatted using elegant markdown (use header hierarchies, bullet lists, and **bold key figures**).
 2. **Cash Flow Critique**: Analyze their budgeting ratios. Address if they satisfy the 50/30/20 rule (Needs ≤ 50%, Savings ≥ 20%, Wants ~ 30%). Comment explicitly on their unallocated investable surplus of €${investableSurplus}/mo if detailed mode is active.
-3. **Austrian Tax Savings Strategy**: Comment on their holiday/christmas payouts. Are they utilizing bonus top-ups effectively? How does their progressive tax bracket affect capital gains? Explain how the Regelbesteuerungsoption works in their favor if their marginal rate is low, or why flat 27.5% KeSt protects them.
-4. **Actionable wealth recommendations**: Outline exactly 3 immediate steps they can take to secure their wealth, reduce tax leakages, or supercharge compounding. Include calculations of their step-up projections where appropriate.
+3. **Tax Savings Strategy for ${countryName}**: Explain how tax rules apply in ${countryName} (such as flat 15% PIT + 18.5% SS in Hungary or progressive brackets + 13th/14th salary discounts in Austria).
+4. **Actionable wealth recommendations**: Outline exactly 3 immediate steps they can take to secure their wealth, reduce tax leakages, or supercharge compounding, taking into account any configured extra lump-sum investments or Zuschläge.
 5. End with a humble, reassuring sentence reminding them that all calculations are local and private. Do not mention any databases.`;
 }
 
@@ -181,9 +189,10 @@ export async function executeAudit(
     }
 
     throw new Error('Unsupported API provider selected.');
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
     console.error('AI Copilot request failed', e);
-    throw new Error(`Audit failed: ${e.message}`);
+    throw new Error(`Audit failed: ${message}`, { cause: e });
   }
 }
 
