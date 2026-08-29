@@ -37,6 +37,7 @@ export default function AICopilotConsole() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
+  const [showTutorial, setShowTutorial] = useState<boolean>(() => !apiKey);
 
   // Compile active data payload for audit execution
   const getAuditPayload = () => ({
@@ -240,7 +241,7 @@ export default function AICopilotConsole() {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: '1.5rem', alignItems: 'start' }}>
+    <div className="layout">
       {/* LEFT: Credentials & Privacy Setup */}
       <aside className="panel panel-inputs">
         {/* Privacy Card */}
@@ -255,7 +256,17 @@ export default function AICopilotConsole() {
 
         {/* Credentials Panel */}
         <section className="card">
-          <h2 className="section-title">🗝️ AI API Key Settings</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+            <h2 className="section-title" style={{ marginBottom: 0 }}>🗝️ AI API Key Settings</h2>
+            <button
+              type="button"
+              className="badge"
+              style={{ cursor: 'pointer', background: showTutorial ? 'rgba(59, 130, 246, 0.2)' : 'var(--surface2)', color: showTutorial ? '#60a5fa' : 'var(--muted)', border: '1px solid var(--border)' }}
+              onClick={() => setShowTutorial(!showTutorial)}
+            >
+              💡 {showTutorial ? 'Hide Tutorial' : 'Free Key Guide'}
+            </button>
+          </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {/* Provider Selection */}
@@ -292,6 +303,143 @@ export default function AICopilotConsole() {
               </span>
             </div>
 
+            {/* Direct Official Key Link Button */}
+            <div>
+              {apiProvider === 'gemini' && (
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary"
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem 0.6rem',
+                    fontSize: '0.74rem',
+                    color: '#60a5fa',
+                    borderColor: 'rgba(59, 130, 246, 0.3)',
+                    background: 'rgba(59, 130, 246, 0.08)',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '0.35rem',
+                  }}
+                >
+                  <span>✨</span> Get Free Google Gemini API Key (0€) ↗
+                </a>
+              )}
+              {apiProvider === 'openrouter' && (
+                <a
+                  href="https://openrouter.ai/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary"
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem 0.6rem',
+                    fontSize: '0.74rem',
+                    color: '#60a5fa',
+                    borderColor: 'rgba(59, 130, 246, 0.3)',
+                    background: 'rgba(59, 130, 246, 0.08)',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '0.35rem',
+                  }}
+                >
+                  <span>🌐</span> Get OpenRouter API Key ↗
+                </a>
+              )}
+              {apiProvider === 'openai' && (
+                <a
+                  href="https://platform.openai.com/api-keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary"
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem 0.6rem',
+                    fontSize: '0.74rem',
+                    color: '#60a5fa',
+                    borderColor: 'rgba(59, 130, 246, 0.3)',
+                    background: 'rgba(59, 130, 246, 0.08)',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '0.35rem',
+                  }}
+                >
+                  <span>🤖</span> Get OpenAI API Key ↗
+                </a>
+              )}
+            </div>
+
+            {/* Step-by-Step Free API Key Tutorial Box */}
+            {showTutorial && (
+              <div
+                style={{
+                  background: 'var(--surface2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  padding: '0.75rem',
+                  fontSize: '0.74rem',
+                  lineHeight: '1.5',
+                  color: 'var(--text)',
+                }}
+              >
+                {apiProvider === 'gemini' && (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.4rem', color: 'var(--blue)', fontWeight: '700' }}>
+                      <span>🚀</span> How to get a 100% Free Gemini API Key:
+                    </div>
+                    <ol style={{ margin: '0 0 0.5rem 1.1rem', padding: 0, color: 'var(--muted)' }}>
+                      <li>
+                        Open <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'underline' }}>Google AI Studio (aistudio.google.com)</a>.
+                      </li>
+                      <li>Sign in with any standard Google (Gmail) account.</li>
+                      <li>Click the blue <strong>"Create API key"</strong> button.</li>
+                      <li>Select <strong>"Create API key in new project"</strong>.</li>
+                      <li>Copy your generated key (<code style={{ background: 'var(--surface)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>AIzaSy...</code>) and paste it below.</li>
+                    </ol>
+                    <div style={{ background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '6px', padding: '0.4rem 0.55rem', color: 'var(--green)', fontSize: '0.70rem' }}>
+                      ✓ <strong>100% Free:</strong> No credit card required. Includes 15 requests/min and 1,500 free requests per day!
+                    </div>
+                  </div>
+                )}
+
+                {apiProvider === 'openrouter' && (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.4rem', color: 'var(--blue)', fontWeight: '700' }}>
+                      <span>🌐</span> How to get an OpenRouter Key:
+                    </div>
+                    <ol style={{ margin: '0 0 0.5rem 1.1rem', padding: 0, color: 'var(--muted)' }}>
+                      <li>
+                        Visit <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'underline' }}>openrouter.ai/keys</a>.
+                      </li>
+                      <li>Sign in using your Google or GitHub account.</li>
+                      <li>Click <strong>"Create Key"</strong> and name it (e.g. <em>Investment Planner</em>).</li>
+                      <li>Copy the generated key (<code style={{ background: 'var(--surface)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>sk-or-v1-...</code>) and paste it below.</li>
+                    </ol>
+                  </div>
+                )}
+
+                {apiProvider === 'openai' && (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.4rem', color: 'var(--blue)', fontWeight: '700' }}>
+                      <span>🤖</span> How to get an OpenAI Key:
+                    </div>
+                    <ol style={{ margin: '0 0 0.5rem 1.1rem', padding: 0, color: 'var(--muted)' }}>
+                      <li>
+                        Visit <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'underline' }}>platform.openai.com/api-keys</a>.
+                      </li>
+                      <li>Log in to your OpenAI account.</li>
+                      <li>Click <strong>"Create new secret key"</strong>.</li>
+                      <li>Copy the key (<code style={{ background: 'var(--surface)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>sk-...</code>) and paste it below.</li>
+                    </ol>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* API Key Input */}
             <div>
               <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.3rem' }}>
@@ -300,7 +448,7 @@ export default function AICopilotConsole() {
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input
                   type={showKey ? 'text' : 'password'}
-                  placeholder="e.g. AIzaSy..."
+                  placeholder={apiProvider === 'gemini' ? 'AIzaSy...' : apiProvider === 'openrouter' ? 'sk-or-v1-...' : 'sk-...'}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   style={{
@@ -331,7 +479,7 @@ export default function AICopilotConsole() {
                 </button>
               </div>
               <span style={{ fontSize: '0.62rem', color: 'var(--muted)', display: 'block', marginTop: '0.25rem' }}>
-                Fully stored inside your local browser storage.
+                Fully stored inside your local browser storage. Never sent to any 3rd-party database.
               </span>
             </div>
 
