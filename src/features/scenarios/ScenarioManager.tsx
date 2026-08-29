@@ -9,23 +9,36 @@ export default function ScenarioManager() {
     handleLoadDraft,
     handleDeleteDraft,
     setIsCompareModalOpen,
+    setIsTemplatesModalOpen,
   } = useInvestmentPlanner();
 
   return (
     <section className="card drafts-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-        <h2 className="section-title" style={{ marginBottom: 0 }}>📁 Saved Scenarios</h2>
-        {savedDrafts.length > 0 && (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.35rem' }}>
+        <h2 className="section-title" style={{ marginBottom: 0 }}>📁 Templates &amp; Scenarios</h2>
+        <div style={{ display: 'flex', gap: '0.3rem' }}>
           <button
             type="button"
-            className="badge"
-            style={{ cursor: 'pointer', background: 'var(--surface2)', color: 'var(--blue)', border: '1px solid var(--border)' }}
-            onClick={() => setIsCompareModalOpen(true)}
+            className="badge badge-info"
+            style={{ cursor: 'pointer', fontSize: '0.70rem' }}
+            onClick={() => setIsTemplatesModalOpen(true)}
+            title="Open Templates &amp; Scenarios Library"
           >
-            👥 Compare Scenarios
+            📚 Library ({savedDrafts.length})
           </button>
-        )}
+          {savedDrafts.length > 0 && (
+            <button
+              type="button"
+              className="badge"
+              style={{ cursor: 'pointer', background: 'var(--surface2)', color: 'var(--blue)', border: '1px solid var(--border)', fontSize: '0.70rem' }}
+              onClick={() => setIsCompareModalOpen(true)}
+            >
+              👥 Compare
+            </button>
+          )}
+        </div>
       </div>
+
       <div className="drafts-row" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <select
           className="drafts-select"
@@ -35,17 +48,18 @@ export default function ScenarioManager() {
             if (draftName) handleLoadDraft(draftName);
           }}
         >
-          <option value="" disabled>Select a saved plan...</option>
+          <option value="" disabled>Load a saved template...</option>
           {savedDrafts.map((d) => (
             <option key={d.name} value={d.name}>
-              {d.name}
+              {d.name} ({d.country === 'AT' ? '🇦🇹' : '🇭🇺'} {d.years}y • €{d.monthlyInvest}/mo)
             </option>
           ))}
         </select>
+
         <div className="draft-actions" style={{ display: 'flex', gap: '0.4rem' }}>
           <input
             type="text"
-            placeholder="Draft name..."
+            placeholder="Save template as..."
             value={newDraftName}
             onChange={(e) => setNewDraftName(e.target.value)}
             style={{
@@ -60,26 +74,22 @@ export default function ScenarioManager() {
             }}
           />
           <button
-            className="input-hint-action"
+            className="btn btn-primary"
             onClick={handleSaveDraft}
+            disabled={!newDraftName.trim()}
             style={{
-              padding: '0.4rem 0.75rem',
-              fontSize: '0.8rem',
-              fontWeight: '600',
-              borderRadius: '6px',
-              border: 'none',
-              background: 'var(--blue)',
-              color: '#0f172a',
-              cursor: 'pointer'
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.78rem',
             }}
           >
             Save
           </button>
         </div>
       </div>
+
       {savedDrafts.length > 0 && (
         <div className="drafts-tags-container" style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
-          <p style={{ fontSize: '0.68rem', color: 'var(--muted)', marginBottom: '0.35rem' }}>Saved Plans:</p>
+          <p style={{ fontSize: '0.68rem', color: 'var(--muted)', marginBottom: '0.35rem' }}>Saved Templates:</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
             {savedDrafts.map((d) => (
               <span
@@ -103,7 +113,7 @@ export default function ScenarioManager() {
                 <span
                   style={{ color: 'var(--red)', cursor: 'pointer', fontWeight: '700', paddingLeft: '0.15rem' }}
                   onClick={() => handleDeleteDraft(d.name)}
-                  title="Delete scenario"
+                  title="Delete template"
                 >
                   ×
                 </span>

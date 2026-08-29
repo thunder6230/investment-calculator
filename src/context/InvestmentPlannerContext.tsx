@@ -116,6 +116,9 @@ export interface PlannerContextType {
   setIsCompareModalOpen: (v: boolean) => void;
   comparedDraftName: string | null;
   setComparedDraftName: (name: string | null) => void;
+  isTemplatesModalOpen: boolean;
+  setIsTemplatesModalOpen: (v: boolean) => void;
+  presetTemplates: Draft[];
 
   apiKey: string;
   setApiKey: (k: string) => void;
@@ -179,11 +182,17 @@ export interface PlannerContextType {
   // --- Action Handlers ---
   handleSaveDraft: () => void;
   handleLoadDraft: (name: string) => void;
+  handleLoadDraftObject: (draft: Draft) => void;
   handleDeleteDraft: (name: string) => void;
+  handleDuplicateDraft: (name: string) => void;
+  handleExportTemplates: () => void;
+  handleImportTemplates: (jsonString: string) => boolean;
   handleApplyGoalSolution: (monthlyAmount: number, yearsCount: number) => void;
 }
 
 const PlannerContext = createContext<PlannerContextType | undefined>(undefined);
+
+import { PRESET_TEMPLATES } from '../features/scenarios/presetTemplates';
 
 const lastSession = (() => {
   try {
@@ -245,6 +254,7 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
   // Modals & Comparison
   const [isGoalSolverOpen, setIsGoalSolverOpen] = useState<boolean>(false);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState<boolean>(false);
   const [comparedDraftName, setComparedDraftName] = useState<string | null>(null);
 
   // ── Extra Investment Events ──────────────────────────────────────────────
@@ -575,32 +585,36 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
     setNewDraftName('');
   };
 
+  const handleLoadDraftObject = (found: Draft) => {
+    setCountry(found.country ?? 'AT');
+    if (found.salaryPeriod) setSalaryPeriod(found.salaryPeriod);
+    setGrossMonthly(found.grossMonthly);
+    setZuschlagMonthly(found.zuschlagMonthly ?? 0);
+    setZuschlagSvsSubject(found.zuschlagSvsSubject ?? true);
+    setFixedCosts(found.fixedCosts);
+    setStartCapital(found.startCapital);
+    setMonthlyInvest(found.monthlyInvest);
+    setJuneExtra(found.juneExtra);
+    setDecemberExtra(found.decemberExtra);
+    setYears(found.years);
+    setMinRate(found.minRate);
+    setMaxRate(found.maxRate);
+    setLifeInsurance(found.lifeInsurance ?? 0);
+    setLoanRepayment(found.loanRepayment ?? 0);
+    setStepUpRate(found.stepUpRate ?? 0);
+    setMilestones(found.milestones ?? []);
+    setExtraInvestments(found.extraInvestments ?? []);
+    setExpenseMode(found.expenseMode ?? 'simple');
+    setExpenseItems(found.expenseItems ?? []);
+    if (found.adjustForInflation !== undefined) setAdjustForInflation(found.adjustForInflation);
+    if (found.inflationRate !== undefined) setInflationRate(found.inflationRate);
+    if (found.taxShieldMode !== undefined) setTaxShieldMode(found.taxShieldMode);
+  };
+
   const handleLoadDraft = (name: string) => {
-    const found = savedDrafts.find((d) => d.name === name);
+    const found = savedDrafts.find((d) => d.name === name) || PRESET_TEMPLATES.find((d) => d.name === name);
     if (found) {
-      setCountry(found.country ?? 'AT');
-      if (found.salaryPeriod) setSalaryPeriod(found.salaryPeriod);
-      setGrossMonthly(found.grossMonthly);
-      setZuschlagMonthly(found.zuschlagMonthly ?? 0);
-      setZuschlagSvsSubject(found.zuschlagSvsSubject ?? true);
-      setFixedCosts(found.fixedCosts);
-      setStartCapital(found.startCapital);
-      setMonthlyInvest(found.monthlyInvest);
-      setJuneExtra(found.juneExtra);
-      setDecemberExtra(found.decemberExtra);
-      setYears(found.years);
-      setMinRate(found.minRate);
-      setMaxRate(found.maxRate);
-      setLifeInsurance(found.lifeInsurance ?? 0);
-      setLoanRepayment(found.loanRepayment ?? 0);
-      setStepUpRate(found.stepUpRate ?? 0);
-      setMilestones(found.milestones ?? []);
-      setExtraInvestments(found.extraInvestments ?? []);
-      setExpenseMode(found.expenseMode ?? 'simple');
-      setExpenseItems(found.expenseItems ?? []);
-      if (found.adjustForInflation !== undefined) setAdjustForInflation(found.adjustForInflation);
-      if (found.inflationRate !== undefined) setInflationRate(found.inflationRate);
-      if (found.taxShieldMode !== undefined) setTaxShieldMode(found.taxShieldMode);
+      handleLoadDraftObject(found);
     }
   };
 
@@ -608,6 +622,44 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
     const updated = savedDrafts.filter((d) => d.name !== name);
     setSavedDrafts(updated);
     localStorage.setItem('investment-calculator-drafts', JSON.stringify(updated));
+  };
+
+  const handleDuplicateDraft = (name: string) => {
+    const found = savedDrafts.find((d) => d.name === name) || PRESET_TEMPLATES.find((d) => d.name === name);
+    if (!found) return;
+    const copyName = `${found.name} (Copy)`;
+    const newDraft: Draft = { ...found, name: copyName, timestamp: Date.now() };
+    const updated = [newDraft, ...savedDrafts.filter((d) => d.name !== copyName)];
+    setSavedDrafts(updated);
+    localStorage.setItem('investment-calculator-drafts', JSON.stringify(updated));
+  };
+
+  const handleExportTemplates = () => {
+    const dataStr = JSON.stringify(savedDrafts, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `investment_templates_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportTemplates = (jsonString: string): boolean => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name && parsed[0].grossMonthly !== undefined) {
+        const existingNames = new Set(savedDrafts.map((d) => d.name));
+        const newOnes = parsed.filter((d: Draft) => !existingNames.has(d.name));
+        const updated = [...newOnes, ...savedDrafts];
+        setSavedDrafts(updated);
+        localStorage.setItem('investment-calculator-drafts', JSON.stringify(updated));
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   };
 
   const handleApplyGoalSolution = (monthlyAmount: number, yearsCount: number) => {
@@ -650,12 +702,12 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         isGoalSolverOpen, setIsGoalSolverOpen,
         isCompareModalOpen, setIsCompareModalOpen,
         comparedDraftName, setComparedDraftName,
+        isTemplatesModalOpen, setIsTemplatesModalOpen,
+        presetTemplates: PRESET_TEMPLATES,
 
         apiKey, setApiKey,
         apiProvider, setApiProvider,
         aiOutput, setAiOutput,
-        savedDrafts,
-        newDraftName, setNewDraftName,
 
         newExpenseName, setNewExpenseName,
         newExpenseAmount, setNewExpenseAmount,
@@ -693,9 +745,16 @@ export const InvestmentPlannerProvider: React.FC<{ children: React.ReactNode }> 
         yearlyContrib,
         lastPoint,
 
+        savedDrafts,
+        newDraftName,
+        setNewDraftName,
         handleSaveDraft,
         handleLoadDraft,
+        handleLoadDraftObject,
         handleDeleteDraft,
+        handleDuplicateDraft,
+        handleExportTemplates,
+        handleImportTemplates,
         handleApplyGoalSolution,
       }}
     >

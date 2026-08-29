@@ -278,10 +278,18 @@ export default function AICopilotConsole() {
                   cursor: 'pointer',
                 }}
               >
-                <option value="gemini">Google Gemini API (Recommended)</option>
-                <option value="openai">OpenAI ChatGPT API</option>
-                <option value="openrouter">OpenRouter API</option>
+                <option value="gemini">Google Gemini API (gemini-3.1-flash-lite)</option>
+                <option value="openai">OpenAI ChatGPT API (gpt-4o-mini)</option>
+                <option value="openrouter">OpenRouter API (gemini-3.1-flash-lite)</option>
               </select>
+            </div>
+
+            {/* Model Badge */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.35rem 0.55rem', background: 'var(--surface2)', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.72rem' }}>
+              <span style={{ color: 'var(--muted)' }}>Active AI Model:</span>
+              <span className="badge badge-info" style={{ fontFamily: 'monospace', fontSize: '0.70rem' }}>
+                {apiProvider === 'openai' ? 'gpt-4o-mini' : 'gemini-3.1-flash-lite'}
+              </span>
             </div>
 
             {/* API Key Input */}

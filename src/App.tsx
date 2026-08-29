@@ -13,6 +13,7 @@ import ExpenseBreakdown from './features/expenses/ExpenseBreakdown';
 import FIRESection from './features/fire/FIRESection';
 import GoalSolverModal from './features/goals/GoalSolverModal';
 import ScenarioCompareModal from './features/scenarios/ScenarioCompareModal';
+import TemplatesModal from './features/scenarios/TemplatesModal';
 import AICopilotConsole from './features/copilot/AICopilotConsole';
 import './App.css';
 
@@ -135,6 +136,7 @@ function MainLayout() {
       {/* Global Modals */}
       <GoalSolverModal />
       <ScenarioCompareModal />
+      <TemplatesModal />
     </div>
   );
 }

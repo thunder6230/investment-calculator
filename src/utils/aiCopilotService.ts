@@ -125,50 +125,22 @@ export async function executeAudit(
 
   try {
     if (provider === 'gemini') {
-      const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-1.5-pro'];
-      let lastError: Error | null = null;
-
-      for (const model of modelsToTry) {
-        try {
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-              }),
-            }
-          );
-
-          if (response.ok) {
-            const json = await response.json();
-            const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) return text;
-          } else {
-            const err = await response.json();
-            lastError = new Error(err.error?.message || `Gemini API returned status ${response.status}`);
-            // If the model is not found or deprecated, try the next model candidate
-            if (
-              response.status === 404 ||
-              err.error?.message?.includes('not found') ||
-              err.error?.message?.includes('no longer available') ||
-              err.error?.message?.includes('deprecated')
-            ) {
-              continue;
-            }
-            throw lastError;
-          }
-        } catch (err) {
-          if (err instanceof Error && err.message.includes('API key not valid')) {
-            throw err;
-          }
-          lastError = err instanceof Error ? err : new Error(String(err));
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
         }
+      );
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error?.message || `Gemini API returned status ${response.status}`);
       }
-
-      if (lastError) throw lastError;
-      return 'No response returned from Gemini.';
+      const json = await response.json();
+      return json.candidates?.[0]?.content?.parts?.[0]?.text || 'No response returned from Gemini.';
     } 
     
     if (provider === 'openai') {
@@ -204,7 +176,7 @@ export async function executeAudit(
           'X-Title': 'FinanzAT Pro Calculator',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-001',
+          model: 'google/gemini-3.1-flash-lite',
           messages: [{ role: 'user', content: prompt }],
         }),
       });
